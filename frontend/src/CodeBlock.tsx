@@ -10,8 +10,7 @@ import { dark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
 export default function CodeBlock(props: any) {
     const { children, className, node, ...rest } = props
-    const match = /language-(\w+)/.exec(className || '')
-    console.log("match", match)
+    const match = /language-(\w+)/i.exec(className || '')
     return match ? (
         <>
             <div className='flex justify-between text-xs px-4 bg-[#f9f9f9] py-2 rounded-t-md -mb-2 w-full mt-2'>

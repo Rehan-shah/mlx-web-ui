@@ -11,19 +11,22 @@ import {
     CommandSeparator,
 } from "@/components/ui/command"
 import CodeBlock from './CodeBlock';
-
 import TextareaAutosize from 'react-textarea-autosize';
 import Sidebar from './Sidebar';
+import { createContext, useContext } from 'react';
+export const AlertContext = createContext(null);
 
-
+import 'katex/dist/katex.min.css'
 import { CirclePause } from 'lucide-react';
 
 export type conv = { role: "system" | "user" | "assistant", content: string }
 
 import Markdown from 'react-markdown'
-import { stringify } from 'querystring';
+import AlertToast from './components/ui/toast';
+import Installtion from './Installtion';
 
-
+import rehypeKatex from 'rehype-katex'
+import remarkMath from 'remark-math'
 export const URL = "http://127.0.0.1:8000"
 
 const headers = {
@@ -59,7 +62,9 @@ function Text({ text, type }: { text: string, type: "user" | "assistant" }) {
             </div>
             <p className='text-left align-middle col-span-11 font-bold '>{type}</p>
             <div />
-            <Markdown className='col-span-11 text-left text-sm text-base w-full text-wrap'
+            <Markdown className='col-span-11 text-left text-sm  w-full text-wrap'
+                remarkPlugins={[remarkMath]}
+                rehypePlugins={[rehypeKatex]}
                 components={{ code: CodeBlock }}
             >{text}</Markdown>
             <div></div>
@@ -80,8 +85,15 @@ function Input({ setInput, setConv, input, Conv, model }:
         model: string
     }) {
 
+    const loadingRef = useRef(false)
     const [loading, setLoading] = useState(false)
-    const [reciving, setReciving] = useState(false)
+    const recevingRef = useRef(false)
+    const [receiving, setReceiving] = useState(false)
+    useEffect(() => {
+        setReceiving(recevingRef.current)
+        console.log(recevingRef.current)
+    }, [recevingRef.current])
+
     function pasteIntoInput(el, text) {
         el.focus();
         if (typeof el.selectionStart == "number"
@@ -98,118 +110,166 @@ function Input({ setInput, setConv, input, Conv, model }:
         }
     }
 
+    const [_, setAlert] = useContext(AlertContext)
 
+    const abortController = new AbortController();
     const handelReq = async () => {
 
-        setConv([...Conv, { role: "user", content: input }])
-        let tempInput = input
-        setInput("")
-        setConv((prevCon) => [...prevCon, { role: "assistant", content: "Loading ..." }])
-        setReciving(true)
-        let config = JSON.parse(localStorage.getItem(`config_${model}`) || localStorage.getItem("defualt"))
-        console.log({
-            messages: [...Conv, { role: "user", content: tempInput }],
-            model: "./models/" + model,
-            stream: true,
-            ...config
-        })
-        const response = await fetch("http://localhost:8000/v1/chat/completions", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify(
-                {
-                    messages: [...Conv, { role: "user", content: tempInput }],
-                    model: "./models/" + model,
-                    stream: true,
-                    max_tokens: config.max_tokens,
-                    temp: config.temp,
-                    top_p: config.top_p,
-                    role_mapping: config.role_mapping
 
-                })
-        });
+        setLoading(true)
+        setConv([...Conv, { role: "user", content: input }]);
+        let tempInput = input;
+        setInput("");
+        setConv((prevCon) => [...prevCon, { role: "assistant", content: "Loading ..." }]);
+        try {
+            let config = JSON.parse(localStorage.getItem(`config_${model}`) || localStorage.getItem("defualt"));
 
-
-
-        if (response.body === null) {
-            console.log('Response body is null');
-            return
-        }
-        const reader = response.body
-            .pipeThrough(new TextDecoderStream())
-            .getReader();
-        setConv((preConv) => {
-            return [...preConv, { role: "assistant", content: "" }]
-        })
-        let assistantResponse = "";
-
-        setConv((prevCon) => prevCon.slice(0, -1))
-        while (true) {
-            const { value, done } = await reader.read();
-
-            if (done || reciving) {
-                console.log("done", done, reciving, done || !reciving)
-                await reader.cancel();
-                console.log("done 2", done, reciving, done || reciving)
-                console.log("triggered")
-                setReciving(false)
-                return
-                break;
+            const body = {
+                messages: [...Conv, { role: "user", content: tempInput }],
+                model: "./models/" + model,
+                stream: true,
+                max_tokens: config.max_tokens,
+                temp: config.temp,
+                top_p: config.top_p,
+            };
+            if (config.show_role_mapping) {
+                body["role_mapping"] = config.role_mapping;
             }
-            assistantResponse += value;
-            setConv((preConv) => [...preConv.slice(0, -1), { role: "assistant", content: assistantResponse }]);
 
+            const response = await fetch("http://localhost:8000/v1/chat/completions", {
+                method: "POST",
+                signal: abortController.signal,
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(body)
+            });
+
+
+            if (response.body === null) {
+                return;
+            }
+            const reader = response.body
+                .pipeThrough(new TextDecoderStream())
+                .getReader();
+            setConv((preConv) => {
+                return [...preConv, { role: "assistant", content: "" }];
+            });
+            let assistantResponse = "";
+
+            setConv((prevCon) => prevCon.slice(0, -1));
+            let i = 0
+            while (true) {
+
+                if (i < 1) {
+                    setLoading(false)
+                    recevingRef.current = true
+                    i++
+                }
+
+                let { value, done } = await reader.read();
+                if (value?.includes("status_code")) {
+                    console.error(JSON.parse(value));
+                    throw new Error("value");
+                }
+
+                if (!recevingRef.current) {
+                    abortController.abort();
+                    break;
+                }
+                if (done) {
+
+                    recevingRef.current = false
+
+                    break;
+                }
+
+                assistantResponse += value;
+                setConv((preConv) => [...preConv.slice(0, -1), { role: "assistant", content: assistantResponse }]);
+            }
+        } catch (error) {
+            setAlert("unable to send request , check console logs for more info");
+            setLoading(false)
+            recevingRef.current = false
+            setConv((prevCon) => prevCon.slice(0, -2));
         }
-    }
-
+    };
 
     return (
         <div className=' m-3 bg-white flex p-1 w-full px-2  mx-auto rounded-xl justify-center border border-gray-400 shadow-gray-200 shadow-sm items-end '>
+            <TextareaAutosize
+                placeholder='Type here'
+                className='w-full disabled:opacity-50  resize-none rounded-lg p-2 focus:outline-none max-h-96'
+                value={input}
+                onChange={(e) => { setInput(e.target.value) }}
+                onKeyDown={(loadingRef.current) ? () => { } : ((evt) => {
+                    if (evt.key == "Enter" && evt.shiftKey) {
+                        if (evt.type == "keypress") {
+                            pasteIntoInput(this, "\n");
+                        }
+                    } else if (evt.key == "Enter") {
+                        evt.preventDefault();
 
-            <TextareaAutosize placeholder='Type here' className='w-full disabled:opacity-50  resize-none rounded-lg p-2 focus:outline-none max-h-96' value={input} onChange={(e) => { setInput(e.target.value) }} onKeyDown={(evt) => {
+                        handelReq();
 
-
-                if (evt.key == "Enter" && evt.shiftKey) {
-                    if (evt.type == "keypress") {
-                        pasteIntoInput(this, "\n");
+                        return;
                     }
-                } else if (evt.key == "Enter") {
-                    evt.preventDefault();
-                    handelReq()
-                    return
-                }
-            }} ></TextareaAutosize>
+                })}
+            ></TextareaAutosize>
 
-            <button className='disabled:opacity-50  w-[20px] h-[20px] m-[10px] flex flex-row justify-center items-center'
-                onClick={async () => { setReciving(true); await handelReq() }}
+            <button
+                className='disabled:opacity-50  w-[20px] h-[20px] m-[10px] flex flex-row justify-center items-center'
+                onClick={receiving ? () => { recevingRef.current = false } : () => { console.log("fje"); handelReq() }} // Call handelReq with trueS
             >
-                <div className={'rounded-md p-[3px] ' + ((input !== "" || (reciving || loading)) ? 'bg-black' : 'bg-gray-200')} >
-                    {!(reciving || loading) ? <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
-                        className={"text-white"}><path d="M7 11L12 6L17 11M12 18V7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path></svg> : <CirclePause className='text-white' width={24} height={24} />}
+                <div
+                    className={'rounded-md p-[3px] ' + ((!loading) ? "bg-black" : "bg-gray-100")}
+
+
+                >
+                    {(!recevingRef.current) ? <svg
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        className={"text-white"}
+                    >
+                        <path
+                            d="M7 11L12 6L17 11M12 18V7"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        ></path>
+                    </svg>
+
+                        : <CirclePause className='text-white' width={24} height={24} />
+                    }
                 </div>
-            </button >
-        </div>
-    )
+            </button>
+        </div >
+    );
 }
+
 
 
 export function ModelSelection({ model, setModel }: { model: string, setModel: React.Dispatch<React.SetStateAction<string>> }) {
 
     const [show, setShow] = useState(false)
+    const [_, setAlert] = useContext(AlertContext)
     const [data, setData] = useState<string[]>([])
 
     useEffect(() => {
-        fetch(URL + "/models?path=./models", {
-            method: "GET",
-            cache: "default"
-        }).then((data) =>
-            data.json().then((data) => {
-                setData(data.models)
-            })).catch((err) => {
-                console.log(err)
-            })
+        if (show) {
+            fetch(URL + "/models?path=./models", {
+                method: "GET",
+                cache: "force-cache"
+            }).then((data) =>
+                data.json().then((data) => {
+                    setData(data.models)
+                })).catch((err) => {
+                    setAlert("Failed to fetch models check console for details")
+                })
+        }
     }, [show])
 
 
@@ -226,59 +286,67 @@ export function ModelSelection({ model, setModel }: { model: string, setModel: R
 
                 </div>
             </button>
-            {show && (<Command className=
-                'w-72 border border-gray-300 shadow-gray-500 shadow-xs h-fit absolute z-10 text-sm'>
-                <CommandInput placeholder="Type the model name..." />
-                <CommandList>
-                    <CommandEmpty>No results found.</CommandEmpty>
-                    {!!data ? <CommandGroup heading="Suggestions" className='text-left'>
-                        {data.map((data, index) => <CommandItem key={index} onSelect={() => setModel(data)}  >{data}</CommandItem>)}
-                    </CommandGroup> :
-                        <CommandItem>Loading...</CommandItem>}
-                    <CommandSeparator />
-                </CommandList>
-            </Command>
-            )}
+            {show && (
+                <Command open={show} onClose={() => setShow(false)} className='w-72  border border-gray-300 shadow-gray-500 shadow-xs h-fit absolute z-10 text-sm'>
+                    <CommandInput placeholder="Type the model name..." />
+                    <CommandList>
+                        <CommandEmpty>
+                            <p>No results found</p>
+                            <Installtion />
+                        </CommandEmpty>
+                        {!!data ? <CommandGroup heading="Suggestions" className='text-left'>
+                            {data.map((data, index) => <CommandItem key={index}
+                                onSelect={() => {
+                                    setModel(data)
+                                    setShow(false)
+                                }
+                                }>{data}</CommandItem>)}
+
+                        </CommandGroup> :
+                            <CommandItem>Loading...</CommandItem>}
+                        <CommandSeparator />
+                    </CommandList>
+                </Command >
+            )
+            }
         </>
     )
 }
 
 
 function TestButton() {
+    const [list, setList] = useState<string[]>(["1", "2", "3"])
     return (
         <>
-            <button onClick={async () => {
-
-
-                const response = await fetch("http://localhost:8000/v1/chat/completions", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify(
-                        { messages: [{ role: "system", content: "You are a helpful assistant." }] })
-                });
-                const reader = response.body
-                    .pipeThrough(new TextDecoderStream())
-                    .getReader();
-                while (true) {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-                    console.log('Received', value);
-                }
-                console.log('Response fully received');
-            }}>test</button >
+            <div className='overflow-y-scroll h-10' ref={(e) => e?.scrollTo({ top: e.scrollHeight, behavior: "smooth" })}>
+                {list.map((data, index) => <div key={index}>{data}</div>)}
+            </div>
+            <button onClick={() => setList([...list, "4"])} >Add new</button>
         </>
     )
 }
 
 
 function Alert({ children }: { childern: Element }) {
-
+    const [alert, setAlert] = useState("")
+    const [open, setOpen] = useState(false)
+    useEffect(() => {
+        if (alert !== "") {
+            setOpen(true)
+            setTimeout(() => {
+                setOpen(false)
+                setAlert("")
+            }, 3000)
+        }
+    }, [alert])
     return (
         <>
-            <div className='z-30 absolute bottom-0 left-1/2  mb-5 p-2 px-4 bg-red-500 text-white text-lg rounded-lg '>Hello </div>
-            {children}
+            <AlertContext.Provider value={[alert, setAlert]}>
+
+                <AlertToast open={open} setOpen={setOpen} title={alert}></AlertToast>
+
+                {children}
+            </AlertContext.Provider >
         </>
     )
 }
@@ -287,10 +355,14 @@ function Alert({ children }: { childern: Element }) {
 
 
 
-export default function App() {
+
+
+function App() {
 
     const [systemPrompt, setSystemPrompt] = useState<string>("")
     const [input, setInput] = useState("")
+
+    const [_, setAlert] = useContext(AlertContext)
     const [conv, setConv] = useState<conv[]>([
         {
             role: "system", content: systemPrompt
@@ -305,7 +377,6 @@ export default function App() {
     ])
 
     const [model, setModel] = useState<string>()
-
     useEffect(() => {
         let config = JSON.parse(localStorage.getItem(`config_${model}`) || localStorage.getItem("defualt"))
         setSystemPrompt(config?.systemPrompt || "")
@@ -324,41 +395,56 @@ export default function App() {
                 }
                 setModel(res.models[0]);
             } catch (error) {
-                console.error('Error fetching data:', error);
+
+                setAlert("Failed to load model, Check console for error")
+                console.log(error)
             }
         })()
 
     }, []);
 
 
-    const [showSetting, setShowSetting] = useState(false)
+
     return (
-        <Alert>
-            <div className='flex h-screen  w-screen  '>
-                <div className='w-1/6 '>
-                    <Sidebar setConv={setConv} Conv={conv} />
-                </div>
-                <main className='w-5/6 px-5 pt-4 ' >
-                    <ModelSelection setModel={setModel} model={model} />
-                    <div className='mx-auto my-0 w-4/6 pt-6'>
-
-                        <div className='h-[80vh] overflow-y-auto '>
-                            {conv
-                                .filter((data) => data.role !== "system")
-                                .map((data, index) => <Text key={index} text={data.content} type={data.role} />)}
-
-                        </div>
-                        <div className='absolute bottom-0 w-[55vw] mb-5'>
-                            <Input setConv={setConv} setInput={setInput} input={input} Conv={conv} model={model} />
-
-
-                            <p className='text-sm text-gray-300 pt-1'>Shift + enter for new line </p>
-                        </div>
-                    </div>
-                </main>
+        <div className='flex h-screen  w-screen  overflow-clip'>
+            <div className='w-64 '>
+                <Sidebar setConv={setConv} Conv={conv} />
             </div>
-        </Alert>
+            <main className='w-5/6 px-5 pt-4 ' >
+                <ModelSelection setModel={setModel} model={model} />
+                <div className='mx-auto my-0 w-4/6 pt-6'>
+
+                    <div className='h-[80vh] overflow-y-auto ' ref={(e) => e?.scrollTo({ top: e.scrollHeight, behavior: "smooth" })} >
+                        {conv
+                            .filter((data) => data.role !== "system")
+                            .map((data, index) => <Text key={index} text={data.content} type={data.role} />)}
+
+                    </div>
+                    <div className='absolute bottom-0 w-[55vw] mb-5'>
+                        <Input setConv={setConv} setInput={setInput} input={input} Conv={conv} model={model} />
+
+
+                        <p className='text-sm text-gray-300 pt-1'>Shift + enter for new line </p>
+                    </div>
+                </div>
+            </main>
+        </div>
     )
 }
 
 
+
+
+
+
+
+export default function Main() {
+    return (
+        <>
+            <Alert>
+                <App />
+
+            </Alert>
+        </>
+    )
+}

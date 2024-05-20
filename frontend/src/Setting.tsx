@@ -1,9 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import { Settings, Trash, X } from 'lucide-react';
 import { Option } from './Sidebar';
-import { ModelSelection } from './App';
 import { URL } from './App';
+import { AlertContext } from './App';
+import { Switch } from "@/components/ui/switch"
+import { sleep } from 'bun';
+
 type Role_mappingT = {
     bos: string,
     eos: string,
@@ -16,6 +19,7 @@ type Role_mappingT = {
 type ModelConfig = {
     kind: 'model',
     model: string,
+    show_role_mapping: boolean
     role_mapping: Role_mappingT,
     systemPrompt: string,
     temp: number,
@@ -40,57 +44,53 @@ const AlertDialogDemo = () => {
     const [modelList, setModelList] = React.useState([])
     const [model, setModel] = React.useState("")
     const [show, setShow] = useState(false)
-
+    const [showRoleModeling, setShowRoleModeling] = useState(true)
+    const [_, setAlert] = useContext(AlertContext)
     let defualtConfig = {
         path: "./models",
-        role_mapping: {
-
-
-            bos: "",
-            eos: "",
-            system: "ASSISTANT's RULE: ",
-            user: "USER: ",
-            assistant: "ASSISTANT: ",
-            eot: "\n"
-        },
         systemPrompt: "A chat between a curious user and an artificial intelligence assistant. The assistant follows the given rules no matter what.",
         temp: 0.7,
         top_p: 1,
         max_tokens: 256
     }
-    if (localStorage.getItem("defualt") === null) {
-        localStorage.setItem("defualt", JSON.stringify(defualtConfig))
-    }
 
     function onSet() {
-        console.log("onsset called", model)
         let config: ConfigT = JSON.parse(localStorage.getItem(`config_${model}`))
-        console.log("config", config, showDefualt)
 
         if (config === null || showDefualt) {
             config = JSON.parse(localStorage.getItem("defualt"))
-        }
-        if (showDefualt) {
-            document.getElementById("path").value = config.path
-        }
-        Object.keys(config.role_mapping).forEach((key: string) => {
-            document.getElementById(key).value = config.role_mapping[key]
-        })
+            if (config === null) {
+                config = defualtConfig
+            }
 
+        }
 
         document.getElementById("systemPrompt").value = config.systemPrompt
         document.getElementById("temp").value = config.temp
         document.getElementById("top_p").value = config.top_p
         document.getElementById("max_tokens").value = config.max_tokens
+        setShowRoleModeling(config.show_role_mapping!)
+        if (showDefualt) {
+            document.getElementById("path").value = config.path
+        } else {
+            if (config.show_role_mapping) {
+
+                Object.keys(config.role_mapping).forEach((key: string) => {
+                    document.getElementById(key).value = config.role_mapping[key]
+                })
+            }
+        }
+
     }
 
 
-    function handleModelChange() {
-        if (!showDefualt) {
-            let model = document.getElementById("model")?.value
-        } else {
+    async function handleModelChange() {
+        if (showDefualt) {
             let path = document.getElementById("path")?.value
+        } else {
+            let model = document.getElementById("model")?.value
         }
+
         let role_model = {}
         role_mappinglist.forEach((key: string) => {
             role_model[key] = document.getElementById(key)?.value
@@ -104,13 +104,24 @@ const AlertDialogDemo = () => {
         let max_tokens = Number(document.getElementById("max_tokens")?.value)
 
         if (!showDefualt) {
-            let config: ConfigT = { model: model, systemPrompt: systemPrompt, role_mapping: role_model, temp: temp, top_p: top_p, max_tokens: max_tokens }
 
+            // let config: ConfigT = { model: model, systemPrompt: systemPrompt, role_mapping: role_model, temp: temp, top_p: top_p, max_tokens: max_tokens }
+            const config = { path: model, systemPrompt: systemPrompt, temp: temp, top_p: top_p, max_tokens: max_tokens, show_role_mapping: showRoleModeling }
+            if (showRoleModeling) {
+                config["role_mapping"] = role_model
+            }
             localStorage.setItem(`config_${model}`, JSON.stringify(config))
-
         } else {
-            let config: ConfigT = { path: path, systemPrompt: systemPrompt, role_mapping: role_model, temp: temp, top_p: top_p, max_tokens: max_tokens }
 
+            const res = await fetch(`${URL}/check_dir?` + new URLSearchParams({ path: path.value }), {
+                method: 'GET',
+            })
+            const pathExist = await res.json()
+            if (!pathExist) {
+                setAlert("Path does not exist , failed to save")
+                return
+            }
+            let config: ConfigT = { path: path.value, systemPrompt: systemPrompt, role_mapping: role_model, temp: temp, top_p: top_p, max_tokens: max_tokens }
             localStorage.setItem("defualt", JSON.stringify(config))
         }
 
@@ -118,32 +129,39 @@ const AlertDialogDemo = () => {
     }
 
     useEffect(() => {
+        if (show) {
+            (async () => {
+                try {
+                    const data = await fetch(`${URL}/models?path=./models`, {
+                        method: 'GET',
+                        cache: "force-cache"
+                    });
+                    const res = await data.json();
+                    setModel(res.models[0]);
+                    setModelList(res.models);
 
-        (async () => {
-            try {
-                const data = await fetch(`${URL}/models?path=./models`, {
-                    method: 'GET',
-                });
-                const res = await data.json();
-                console.log("list", res)
-                setModel(res.models[0]);
-                setModelList(res.models);
+                } catch (error) {
+                    setAlert("Failed to load model, Check console for error")
+                    console.log(error)
+                }
+            })()
+        }
+    }, [show]);
 
-            } catch (error) {
-                console.error('Error fetching data:', error);
-            }
-        })()
-    }, []);
 
+    function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
 
     useEffect(() => {
 
+        setShowRoleModeling(true)
+        sleep(1).then(() => {
 
-        if (show) {
-            (new Promise(r => setTimeout(r, 1))).then(() => {
+            if (show) {
                 onSet()
-            })
-        }
+            }
+        })
     }, [show, showDefualt, model])
 
     return (<AlertDialog.Root onOpenChange={setShow} open={show} >
@@ -173,7 +191,6 @@ const AlertDialogDemo = () => {
                                 <>
                                     <h2 className='bold'>Model Name</h2>
                                     <select id="model" onChange={(e) => {
-                                        console.log(e.target.value)
                                         setModel(e.target.value)
                                     }} value={model} className='outline-none px-2'>
                                         {modelList.map((model) => {
@@ -218,14 +235,30 @@ const AlertDialogDemo = () => {
                         </div>
 
                         <div className='py-3'><hr /></div>
-                        <div className='flex justify-between w-full'>
-                            <h2>Role Modeling</h2>
-                            <div className='w-50'>
-                                {role_mappinglist.map((role, i) => (
-                                    <div className='grid grid-cols-3 w-50 mb-2' key={i}> <p className='left mr-2'>{role.toUpperCase()}</p> <input type="text" defaultValue="" id={role} className='w-35 col-span-2 border border-black rounded focus:outline-none pd-1' /> </div>
-                                ))}
-                            </div>
-                        </div>
+                        {!showDefualt &&
+                            <>
+                                <div className='flex justify-between py-2 '>
+                                    <h2 className='bold'>Enable custom Role mapping</h2>
+                                    <Switch
+                                        checked={showRoleModeling}
+                                        onCheckedChange={setShowRoleModeling}
+                                    />
+
+                                </div>
+                                {showRoleModeling && <>
+                                    <hr />
+                                    <div className='flex justify-between w-full py-2'>
+                                        <h2>Role Modeling</h2>
+                                        <div className='w-50'>
+                                            {role_mappinglist.map((role, i) => {
+                                                return (<div className='grid grid-cols-3 w-50 mb-2' key={i}> <p className='left mr-2'>{role.toUpperCase()}</p> <input type="text" defaultValue="" id={role} className='w-35 col-span-2 border border-black rounded focus:outline-none pd-1' /> </div>)
+                                            })}
+
+                                        </div>
+                                    </div>
+                                </>}
+                            </>}
+
 
                         <button onClick={handleModelChange} className='w-full bg-black text-white mt-6 h-10 hover:bg-white hover:text-black hover:border hover:border-black rounded-md'>Save</button>
                     </div>

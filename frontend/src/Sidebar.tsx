@@ -1,7 +1,8 @@
 import { Import, LucideIcon, Save, Settings, Trash } from 'lucide-react';
 import React, { useState } from 'react'
 import type { conv } from './App'
-
+import { useContext } from 'react';
+import { AlertContext } from './App';
 
 import Setting from './Setting';
 interface JsonData {
@@ -15,18 +16,20 @@ function Element({ item, savedConv, setConvSaved, setConv }: {
 }) {
     const [show, setShow] = useState(false);
 
+    const [_, setAlert] = useContext(AlertContext)
 
     const handleClick = () => {
         let instanceOfConv = { ...savedConv };
-        console.log(instanceOfConv)
         const updatedConvData = { ...instanceOfConv };
         delete updatedConvData[item];
         localStorage.setItem('convs', JSON.stringify(updatedConvData));
         setConvSaved(updatedConvData);
+
+        setAlert("deleted chat succesfull")
     };
     return (
         <div
-            className="flex justify-between hover:bg-gray-100  py-1 my-1.5 px-2 rounded-md"
+            className="flex justify-between hover:bg-gray-100 flex-wrap py-1 my-1.5 px-2 rounded-md"
             onMouseEnter={() => {
                 setShow(true);
             }}
@@ -38,7 +41,7 @@ function Element({ item, savedConv, setConvSaved, setConv }: {
 
         >
             <button className="text-sm hover:outline-none"
-            >{(new Date(item)).toGMTString().substring(0, 26)}</button>
+            >{(new Date(item)).toLocaleString()}</button>
             <Trash
                 onClick={handleClick}
                 className={"w-[0.875rem] " + (!show ? "opacity-0" : "opacity-100")}
@@ -81,9 +84,7 @@ export default function Sidebar({ Conv, setConv }: { Conv: conv[], setConv: Reac
             savedConvs = {}
         }
 
-        console.log("pre saved", savedConvs)
         savedConvs[Date.now()] = Conv
-        console.log(savedConvs)
         localStorage.setItem("convs", JSON.stringify(savedConvs))
         setSavedConv(savedConvs)
     }
