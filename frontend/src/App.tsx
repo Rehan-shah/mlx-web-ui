@@ -122,20 +122,23 @@ function Input({ setInput, setConv, input, Conv, model }:
         setInput("");
         setConv((prevCon) => [...prevCon, { role: "assistant", content: "Loading ..." }]);
         try {
-            let config = JSON.parse(localStorage.getItem(`config_${model}`) || localStorage.getItem("defualt"));
+            let config = JSON.parse(localStorage.getItem(`config_${model}`));
+            let defaultConfig = JSON.parse(localStorage.getItem("default"));
+            if (config == null) {
+                config = defaultConfig
+            }
+            if (config.show_role_mapping) {
+                body["role_mapping"] = config.role_mapping;
+            }
 
             const body = {
                 messages: [...Conv, { role: "user", content: tempInput }],
-                model: "./models/" + model,
+                model: defaultConfig.path + model,
                 stream: true,
                 max_tokens: config.max_tokens,
                 temp: config.temp,
                 top_p: config.top_p,
             };
-            if (config.show_role_mapping) {
-                body["role_mapping"] = config.role_mapping;
-            }
-
             const response = await fetch("http://localhost:8000/v1/chat/completions", {
                 method: "POST",
                 signal: abortController.signal,
@@ -260,7 +263,8 @@ export function ModelSelection({ model, setModel }: { model: string, setModel: R
 
     useEffect(() => {
         if (show) {
-            fetch(URL + "/models?path=./models", {
+            const config = JSON.parse(localStorage.getItem("default") || "{}")
+            fetch(URL + `/models?path=${config.path}`, {
                 method: "GET",
                 cache: "force-cache"
             }).then((data) =>
@@ -353,16 +357,70 @@ function Alert({ children }: { childern: Element }) {
 
 
 
+function IntroductionOverlay({ setShow }) {
+    const inputRef = useRef(null);
+    const [_, setAlert] = useContext(AlertContext);
+    const dir = {
+        path: "./models",
+        systemPrompt: "A chat between a curious user and an artificial intelligence assistant. The assistant follows the given rules no matter what.",
+        temp: 0.7,
+        top_p: 1,
+        max_tokens: 256,
+        show_role_mapping: false
+    };
 
+    return (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+            <div className="absolute inset-0 bg-black opacity-50 pointer-events-none"></div>
+            <div className="w-1/3 p-8 bg-white rounded-lg drop-shadow-md z-100 relative">
+                <h1 className="text-2xl font-bold">Welcome to MLX web ui</h1>
+                <p className="text-sm py-2">
+                    Before starting, please enter your folder path where your models are saved/will be saved.
+                    If you enter a relative path, make it relative to the backend folder in the mlx-web-ui folder.
+                    <br />
+                    <p>
+                        ./models is the defualt dir , u can countuine with that
+                    </p>
+                </p>
+                <div className="py-4"></div>
+                <input
+                    ref={inputRef}
+                    defaultValue={"./models"}
+                    placeholder="Enter your path"
+                    className="w-72 h-12 rounded p-2 mb-4 z-100 relative pointer-events-auto focus:outline-none"
+                    type="text"
+                />
+                <button
+                    className="bg-black text-white rounded text-md p-1 z-100 relative pointer-events-auto"
+                    onClick={async () => {
+                        const res = await fetch("http://localhost:8000/check_dir?path=" + (inputRef.current?.value || ""), {});
+                        let isDir = (await res.json())
+                        if (!isDir) {
+                            setAlert("Invalid path, please try again");
+                        } else {
+                            let value = (inputRef.current?.value || "").trim()
+                            if (!value.endsWith("/")) value += "/"
+                            dir.path = value;
 
-
+                            localStorage.setItem("default", JSON.stringify(dir));
+                            setShow(false);
+                            console.log("saved");
+                        }
+                    }}
+                >
+                    Submit
+                </button>
+            </div>
+        </div>
+    );
+}
 
 function App() {
 
     const [systemPrompt, setSystemPrompt] = useState<string>("")
     const [input, setInput] = useState("")
-
     const [_, setAlert] = useContext(AlertContext)
+    const [intro, setIntro] = useState(false)
     const [conv, setConv] = useState<conv[]>([
         {
             role: "system", content: systemPrompt
@@ -376,16 +434,26 @@ function App() {
         }
     ])
 
-    const [model, setModel] = useState<string>()
+    const [model, setModel] = useState<string>("")
     useEffect(() => {
-        let config = JSON.parse(localStorage.getItem(`config_${model}`) || localStorage.getItem("defualt"))
+        if (intro) return
+        let config = JSON.parse(localStorage.getItem(`config_${model}`) || localStorage.getItem("default"))
+        console.log(config, !config)
+        console.log(localStorage.getItem("defualt"))
+
+        if (!config) {
+
+            setIntro(true)
+        }
         setSystemPrompt(config?.systemPrompt || "")
-    }, [model])
+    }, [model, intro])
 
     useEffect(() => {
+        if (intro) return
         (async () => {
             try {
-                const data = await fetch(`${URL}/models?path=./models`, {
+                let config = JSON.parse(localStorage.getItem("default"))
+                const data = await fetch(`${URL}/models?path=${config.path}`, {
                     method: 'GET',
                 });
                 const res = await data.json();
@@ -401,34 +469,38 @@ function App() {
             }
         })()
 
-    }, []);
+    }, [intro]);
 
 
 
     return (
-        <div className='flex h-screen  w-screen  overflow-clip'>
-            <div className='w-64 '>
-                <Sidebar setConv={setConv} Conv={conv} />
-            </div>
-            <main className='w-5/6 px-5 pt-4 ' >
-                <ModelSelection setModel={setModel} model={model} />
-                <div className='mx-auto my-0 w-4/6 pt-6'>
+        <div>
+            {intro && <IntroductionOverlay setShow={setIntro} />}
+            <div className={'flex h-screen  w-screen  overflow-clip' + (!intro && "blur-sm")}>
 
-                    <div className='h-[80vh] overflow-y-auto ' ref={(e) => e?.scrollTo({ top: e.scrollHeight, behavior: "smooth" })} >
-                        {conv
-                            .filter((data) => data.role !== "system")
-                            .map((data, index) => <Text key={index} text={data.content} type={data.role} />)}
-
-                    </div>
-                    <div className='absolute bottom-0 w-[55vw] mb-5'>
-                        <Input setConv={setConv} setInput={setInput} input={input} Conv={conv} model={model} />
-
-
-                        <p className='text-sm text-gray-300 pt-1'>Shift + enter for new line </p>
-                    </div>
+                <div className='w-64 '>
+                    <Sidebar setConv={setConv} Conv={conv} />
                 </div>
-            </main>
-        </div>
+                <main className='w-5/6 px-5 pt-4 ' >
+                    <ModelSelection setModel={setModel} model={model} />
+                    <div className='mx-auto my-0 w-4/6 pt-6'>
+
+                        <div className='h-[80vh] overflow-y-auto ' ref={(e) => e?.scrollTo({ top: e.scrollHeight, behavior: "smooth" })} >
+                            {conv
+                                .filter((data) => data.role !== "system")
+                                .map((data, index) => <Text key={index} text={data.content} type={data.role} />)}
+
+                        </div>
+                        <div className='absolute bottom-0 w-[55vw] mb-5'>
+                            <Input setConv={setConv} setInput={setInput} input={input} Conv={conv} model={model} />
+
+
+                            <p className='text-sm text-gray-300 pt-1'>Shift + enter for new line </p>
+                        </div>
+                    </div>
+                </main >
+            </div >
+        </div >
     )
 }
 

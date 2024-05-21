@@ -46,25 +46,14 @@ const AlertDialogDemo = () => {
     const [show, setShow] = useState(false)
     const [showRoleModeling, setShowRoleModeling] = useState(true)
     const [_, setAlert] = useContext(AlertContext)
-    let defualtConfig = {
-        path: "./models",
-        systemPrompt: "A chat between a curious user and an artificial intelligence assistant. The assistant follows the given rules no matter what.",
-        temp: 0.7,
-        top_p: 1,
-        max_tokens: 256
-    }
 
     function onSet() {
         let config: ConfigT = JSON.parse(localStorage.getItem(`config_${model}`))
 
         if (config === null || showDefualt) {
-            config = JSON.parse(localStorage.getItem("defualt"))
-            if (config === null) {
-                config = defualtConfig
-            }
+            config = JSON.parse(localStorage.getItem("default"))
 
         }
-
         document.getElementById("systemPrompt").value = config.systemPrompt
         document.getElementById("temp").value = config.temp
         document.getElementById("top_p").value = config.top_p
@@ -124,7 +113,7 @@ const AlertDialogDemo = () => {
             let config: ConfigT = { path: path.value, systemPrompt: systemPrompt, role_mapping: role_model, temp: temp, top_p: top_p, max_tokens: max_tokens }
             localStorage.setItem("defualt", JSON.stringify(config))
         }
-
+        setShow(false)
 
     }
 
@@ -132,7 +121,8 @@ const AlertDialogDemo = () => {
         if (show) {
             (async () => {
                 try {
-                    const data = await fetch(`${URL}/models?path=./models`, {
+                    const config = JSON.parse(localStorage.getItem("default"))
+                    const data = await fetch(`${URL}/models?path=${config.path}`, {
                         method: 'GET',
                         cache: "force-cache"
                     });
