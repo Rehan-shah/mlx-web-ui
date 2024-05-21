@@ -111,7 +111,7 @@ const AlertDialogDemo = () => {
                 return
             }
             let config: ConfigT = { path: path.value, systemPrompt: systemPrompt, role_mapping: role_model, temp: temp, top_p: top_p, max_tokens: max_tokens }
-            localStorage.setItem("defualt", JSON.stringify(config))
+            localStorage.setItem("default", JSON.stringify(config))
         }
         setShow(false)
 
