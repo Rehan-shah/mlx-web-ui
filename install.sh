@@ -33,9 +33,9 @@ else
     brew install --cask miniconda
 fi
 
-git clone https://github.com/Rehan-shah/mlx-ui-server.git 
+git clone https://github.com/Rehan-shah/mlx-web-ui.git 
 
-cd mlx-ui-server
+cd mlx-web-ui
 cd backend
 conda env create -f environment.yml 
 cd ../frontend

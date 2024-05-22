@@ -2,6 +2,7 @@
 
 Hello, this repo is an easy way to run a web server for MLX. The design is very minimalistic and contains multiple features like:
 
+- Tokens per sec info on screen
 - Support for Latex and code formatting (allows to copy the code snippet )
 - Ability to set model params (top p, temp, role mapping...)
 - Ability to set default params
@@ -29,7 +30,7 @@ No pre-requisites or dependencies needed.
 You would only need to run this command to install:
 
 ```bash
-bash -c "$(curl -s https://raw.githubusercontent.com/Rehan-shah/mlx-web-ui/main/install.sh)"
+sudo bash -c "$(curl -s https://raw.githubusercontent.com/Rehan-shah/mlx-web-ui/main/install.sh)"
 ```
 
 ## Getting Started
@@ -37,13 +38,13 @@ bash -c "$(curl -s https://raw.githubusercontent.com/Rehan-shah/mlx-web-ui/main/
 After installation, navigate to the `mlx-web-ui` directory:
 
 ```
-cd ../mlx-web-ui
+cd mlx-web-ui
 ```
 
 To start the server, run:
 
 ```
-bash main.sh
+sudo bash main.sh
 ```
 
 This will start the web server on `http://localhost:5173`. Open your web browser and navigate to `http://localhost:5173` to access the MLX Web UI.
