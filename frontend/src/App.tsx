@@ -115,7 +115,6 @@ function Input({ setInput, setConv, input, Conv, model }:
     const abortController = new AbortController();
     const handelReq = async () => {
 
-
         setLoading(true)
         setConv([...Conv, { role: "user", content: input }]);
         let tempInput = input;
@@ -162,15 +161,19 @@ function Input({ setInput, setConv, input, Conv, model }:
 
             setConv((prevCon) => prevCon.slice(0, -1));
             let i = 0
+            let midTime = 0
+            let endTime = 0
             while (true) {
 
                 if (i < 1) {
+                    midTime = Date.now()
                     setLoading(false)
                     recevingRef.current = true
-                    i++
                 }
 
                 let { value, done } = await reader.read();
+
+                i++
                 if (value?.includes("status_code")) {
                     console.error(JSON.parse(value));
                     throw new Error("value");
@@ -178,10 +181,12 @@ function Input({ setInput, setConv, input, Conv, model }:
 
                 if (!recevingRef.current) {
                     abortController.abort();
+                    endTime = Date.now()
                     break;
                 }
                 if (done) {
 
+                    endTime = Date.now()
                     recevingRef.current = false
 
                     break;
@@ -190,6 +195,9 @@ function Input({ setInput, setConv, input, Conv, model }:
                 assistantResponse += value;
                 setConv((preConv) => [...preConv.slice(0, -1), { role: "assistant", content: assistantResponse }]);
             }
+            console.log(midTime, endTime)
+            console.log(i)
+            console.log(midTime, endTime - midTime,)
         } catch (error) {
             setAlert("unable to send request , check console logs for more info");
             setLoading(false)

@@ -1,4 +1,3 @@
-from re import UNICODE
 from typing import List, Optional
 from huggingface_hub import snapshot_download
 from mlx_lm import generate , load
@@ -193,7 +192,7 @@ def installModel(body:InstallModel):
         return
     yield "downloading"
     try :
-        snapshot_download(repo_id=body.hf_path, local_dir=path)
+        snapshot_download( resume_download=True,repo_id=body.hf_path, local_dir=path)
     except Exception as e:
         yield f"error: {e} , Happen when downloading the model"
         return
