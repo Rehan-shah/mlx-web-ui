@@ -75,14 +75,15 @@ function Text({ text, type }: { text: string, type: "user" | "assistant" }) {
     )
 }
 
-function Input({ setInput, setConv, input, Conv, model }:
+function Input({ setInput, setConv, input, Conv, model, setTokenPerSec }:
 
     {
         setInput: React.Dispatch<React.SetStateAction<string>>,
         setConv: React.Dispatch<React.SetStateAction<conv[]>>,
         input: string,
         Conv: conv[],
-        model: string
+        model: string,
+        setTokenPerSec: React.Dispatch<React.SetStateAction<string>>
     }) {
 
     const loadingRef = useRef(false)
@@ -126,9 +127,6 @@ function Input({ setInput, setConv, input, Conv, model }:
             if (config == null) {
                 config = defaultConfig
             }
-            if (config.show_role_mapping) {
-                body["role_mapping"] = config.role_mapping;
-            }
 
             const body = {
                 messages: [...Conv, { role: "user", content: tempInput }],
@@ -138,6 +136,12 @@ function Input({ setInput, setConv, input, Conv, model }:
                 temp: config.temp,
                 top_p: config.top_p,
             };
+
+
+            if (config.show_role_mapping) {
+                body["role_mapping"] = config.role_mapping;
+            }
+
             const response = await fetch("http://localhost:8000/v1/chat/completions", {
                 method: "POST",
                 signal: abortController.signal,
@@ -195,11 +199,11 @@ function Input({ setInput, setConv, input, Conv, model }:
                 assistantResponse += value;
                 setConv((preConv) => [...preConv.slice(0, -1), { role: "assistant", content: assistantResponse }]);
             }
-            console.log(midTime, endTime)
-            console.log(i)
-            console.log(midTime, endTime - midTime,)
+            setTokenPerSec((i / ((endTime - midTime) / 1000)).toFixed(1))
+
         } catch (error) {
             setAlert("unable to send request , check console logs for more info");
+            console.error("Error while fetching:", error.message);
             setLoading(false)
             recevingRef.current = false
             setConv((prevCon) => prevCon.slice(0, -2));
@@ -230,7 +234,7 @@ function Input({ setInput, setConv, input, Conv, model }:
 
             <button
                 className='disabled:opacity-50  w-[20px] h-[20px] m-[10px] flex flex-row justify-center items-center'
-                onClick={receiving ? () => { recevingRef.current = false } : () => { console.log("fje"); handelReq() }} // Call handelReq with trueS
+                onClick={receiving ? () => { recevingRef.current = false } : () => { handelReq() }} // Call handelReq with trueS
             >
                 <div
                     className={'rounded-md p-[3px] ' + ((!loading) ? "bg-black" : "bg-gray-100")}
@@ -429,7 +433,9 @@ function App() {
     const [input, setInput] = useState("")
     const [_, setAlert] = useContext(AlertContext)
     const [intro, setIntro] = useState(false)
+    const [tokenPerSec, setTokenPerSec] = useState("NA")
     const [conv, setConv] = useState<conv[]>([
+
         {
             role: "system", content: systemPrompt
         }, {
@@ -490,7 +496,12 @@ function App() {
                     <Sidebar setConv={setConv} Conv={conv} />
                 </div>
                 <main className='w-5/6 px-5 pt-4 ' >
-                    <ModelSelection setModel={setModel} model={model} />
+                    <div className='flex justify-between'>
+                        <ModelSelection setModel={setModel} model={model} />
+                        <h1 className='text-gray-500 py-2 px-4 text-sm'>{tokenPerSec}/s</h1>
+
+
+                    </div>
                     <div className='mx-auto my-0 w-4/6 pt-6'>
 
                         <div className='h-[80vh] overflow-y-auto ' ref={(e) => e?.scrollTo({ top: e.scrollHeight, behavior: "smooth" })} >
@@ -500,7 +511,13 @@ function App() {
 
                         </div>
                         <div className='absolute bottom-0 w-[55vw] mb-5'>
-                            <Input setConv={setConv} setInput={setInput} input={input} Conv={conv} model={model} />
+                            <Input setConv={setConv}
+                                setInput={setInput}
+                                input={input}
+                                Conv={conv}
+                                model={model}
+                                setTokenPerSec={setTokenPerSec}
+                            />
 
 
                             <p className='text-sm text-gray-300 pt-1'>Shift + enter for new line </p>
@@ -523,7 +540,6 @@ export default function Main() {
         <>
             <Alert>
                 <App />
-
             </Alert>
         </>
     )
