@@ -53,8 +53,8 @@ export function Option({ text, Svg, onClick }: { text: string, Svg: LucideIcon, 
 
 
     return (
-        <div onClick={!onClick ? () => { } : onClick} className="flex justify-between  rounded-md my-1  bg-[#f9f9f9] ">
-            <div role='button' className='flex gap-2 p-2 w-full px-2 hover:bg-gray-200 rounded-md'>
+        <div role="button" onClick={!onClick ? () => { } : onClick} className="flex justify-between  rounded-md my-1  bg-[#f9f9f9] ">
+            <div className='flex gap-2 p-2 w-full px-2 hover:bg-gray-200 rounded-md'>
                 <Svg className='w-[1.5rem] h-[1.5rem] opacity-70' />
                 <p className="text-base text-left px-2  opacity-70">{text}</p>
             </div>

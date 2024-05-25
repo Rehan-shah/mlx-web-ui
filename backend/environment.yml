@@ -136,7 +136,7 @@ dependencies:
   - yarl=1.9.4=py312he37b823_0
   - zstd=1.5.5=h4f39d0f_0
   - pip:
-      - mlx-lm==0.12.1
+      - mlx-lm
       - mpmath==1.3.0
       - networkx==3.3
       - sentencepiece==0.2.0

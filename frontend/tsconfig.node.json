@@ -1,0 +1,9 @@
+
+{
+  "compilerOptions": {
+    "composite": true,
+    "module": "commonjs",
+    "esModuleInterop": true
+  },
+  "include": ["src"]
+}

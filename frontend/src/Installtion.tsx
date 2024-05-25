@@ -36,6 +36,7 @@ const useDebounce = (value, delay) => {
 };
 
 
+const abortController = new AbortController();
 async function installSend(
     stopRef: React.MutableRefObject<boolean>, config: ConfigInst, setInstall: React.Dispatch<React.SetStateAction<string>>
 ) {
@@ -48,7 +49,6 @@ async function installSend(
             quantization: config.quantization,
             model_path: config.target_dir
         }
-        const abortController = new AbortController();
 
         const response = await fetch("http://localhost:8000/add_models", {
             method: "POST",
@@ -221,7 +221,7 @@ function Content({ newView, list, setConfig, config, setNewView, getItem, modelN
 }) {
 
 
-
+    console.log(config)
 
     switch (newView) {
         case "hf":
@@ -230,14 +230,15 @@ function Content({ newView, list, setConfig, config, setNewView, getItem, modelN
                     <input placeholder="Enter model name here" onChange={(e) => setModelName(e.target.value)} className="w-full outline-none p-2 text-lg" />
                     {list.map((item, i) => <p key={i} onClick={() => { setConfig({ ...config, hf_name: item }); setModelName(item); setNewView("llm") }} className="hover:bg-gray-100 cursor-pointer p-2 rounded-md">{item}</p >)
                     }
-                    <button className="p-2 bg-black text-white rounded-lg mt-4 w-full hover:text-black hover:bg-white border border-black" onClick={async () => { await getItem() }}>View more (we recomend using seach bar instead)</button>
+                    <button className="p-2 bg-black text-white rounded-lg mt-4 w-full hover:text-black hover:bg-white border border-black" onClick={() => { getItem() }}>View more (we recomend using seach bar instead)</button>
                 </div>
             )
         case "llm":
 
             return (
                 <div className="px-2">
-                    <p className="py-2 text-md flex gap-[4.5rem]">HF Name : <p>mlx-community\{config.hf_name}</p></p >
+                    <p className="py-2 text-md flex gap-[4.5rem]">HF Name : mlx-community\{config.hf_name}</p >
+
                     <div className="flex text-md gap-10 items-center ">Saved Name : <input placeholder="Enter model name here" value={config.name} onChange={(e) => {
                         setConfig({ ...config, name: e.target.value })
                     }} className=" outline-none p-2 w-4/6 text-md" />
@@ -336,8 +337,10 @@ export default function Installtion() {
     }, [debouncedValue])
 
     useEffect(() => {
+
         if (newView === "llm") {
-            const { path } = JSON.parse(localStorage.getItem("defualt"))
+            console.log(JSON.parse(localStorage.getItem("default")))
+            const { path } = JSON.parse(localStorage.getItem("default"))
             setConfig({ name: modelName, hf_name: modelName, quantization: 0, target_dir: path })
             return
         }
@@ -350,7 +353,6 @@ export default function Installtion() {
             }
         })()
     }, [newView])
-
 
 
 
@@ -399,7 +401,7 @@ export default function Installtion() {
                             newView={newView} setNewView={setNewView} config={config} list={list}
                             setConfig={setConfig} getItem={getItem} modelName={modelName}
                             setModelName={setModelName} install={install}
-                            stopRef={stopRef} setModelName={setModelName}
+                            stopRef={stopRef}
                         />
                     </div>
                 </>
