@@ -30,7 +30,7 @@ No pre-requisites or dependencies needed.
 You would only need to run this command to install:
 
 ```bash
-sudo bash -c "$(curl -s https://raw.githubusercontent.com/Rehan-shah/mlx-web-ui/main/install.sh)"
+bash -c "$(curl -s https://raw.githubusercontent.com/Rehan-shah/mlx-web-ui/main/install.sh)"
 ```
 
 ## Getting Started
