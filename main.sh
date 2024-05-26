@@ -4,7 +4,6 @@
 
 # Initialize conda
 eval "$(conda shell.bash hook)"
-conda init
 conda activate mlx-backend
 
 # Start frontend and backend servers in the same process group
