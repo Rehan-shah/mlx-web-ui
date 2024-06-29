@@ -17,7 +17,7 @@ import { createContext, useContext } from 'react';
 export const AlertContext = createContext(null);
 
 import 'katex/dist/katex.min.css'
-import { CirclePause } from 'lucide-react';
+import { CirclePause, Paperclip, PaperclipIcon, Pin } from 'lucide-react';
 
 export type conv = { role: "system" | "user" | "assistant", content: string }
 
@@ -27,10 +27,20 @@ import Installtion from './Installtion';
 
 import rehypeKatex from 'rehype-katex'
 import remarkMath from 'remark-math'
+import FileShow from './components/file_show';
 export const URL = "http://127.0.0.1:8000"
 
 const headers = {
     'Content-Type': 'application/json',
+}
+
+
+
+export type pidT = {
+    pid: null | string,
+    filename: string,
+    size: number,
+    type: string
 }
 
 function Text({ text, type }: { text: string, type: "user" | "assistant" }) {
@@ -38,7 +48,7 @@ function Text({ text, type }: { text: string, type: "user" | "assistant" }) {
     let url = ""
 
     if (type === "user") {
-        url = "https://avatars.githubusercontent.com/u/65281592?v=4"
+        url = "pf.png"
     } else {
         url = "https://styles.redditmedia.com/t5_81eyvm/styles/communityIcon_cumnsvx9kzma1.png"
     }
@@ -90,6 +100,7 @@ function Input({ setInput, setConv, input, Conv, model, setTokenPerSec }:
     const [loading, setLoading] = useState(false)
     const recevingRef = useRef(false)
     const [receiving, setReceiving] = useState(false)
+    const [pidList, setPidList] = useState<pidT[]>([])
     useEffect(() => {
         setReceiving(recevingRef.current)
         console.log(recevingRef.current)
@@ -128,8 +139,13 @@ function Input({ setInput, setConv, input, Conv, model, setTokenPerSec }:
                 config = defaultConfig
             }
 
+            console.log(Conv)
             const body = {
-                messages: [...Conv, { role: "user", content: tempInput }],
+                messages: {
+                    pid: pidList.map((e) => e.pid),
+                    messages: [{ role: "system", content: config.systemPrompt }, ...Conv, { role: "user", content: tempInput }]
+                },
+
                 model: defaultConfig.path + model,
                 stream: true,
                 max_tokens: config.max_tokens,
@@ -210,57 +226,120 @@ function Input({ setInput, setConv, input, Conv, model, setTokenPerSec }:
         }
     };
 
+
+
+    async function sendFile(e: React.ChangeEvent<HTMLInputElement>) {
+
+        const fileInput = e.target;
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) return;
+        const pid_of_file: pidT = { pid: null, filename: file.name, size: file.size, type: file.name.split(".").at(-1) }
+        setPidList(
+            (e) => [...e, pid_of_file]
+        )
+        setLoading(true)
+
+
+
+        if (!file) return; // or handle the error however you like
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        let res = await fetch(URL + "/create_vdb", {
+            method: "POST",
+            body: formData,
+        });
+
+        if (!res.ok) {
+            setAlert("unable to process file , check console logs for more info");
+            setPidList(
+                (e) => e.toSpliced(e.length - 1, 1)
+            )
+            console.error("Error while fetching:", await res.text());
+            return
+        }
+
+        const json_parsed = await res.json()
+
+        pid_of_file.pid = json_parsed.pid
+        setPidList(
+            (e) => {
+                return [...e.toSpliced(e.length - 1, 1), pid_of_file]
+
+            }
+
+        )
+
+
+        setLoading(false)
+
+    }
+
     return (
-        <div className=' m-3 bg-white flex p-1 w-full px-2  mx-auto rounded-xl justify-center border border-gray-400 shadow-gray-200 shadow-sm items-end '>
-            <TextareaAutosize
-                placeholder='Type here'
-                className='w-full disabled:opacity-50  resize-none rounded-lg p-2 focus:outline-none max-h-96'
-                value={input}
-                onChange={(e) => { setInput(e.target.value) }}
-                onKeyDown={(loadingRef.current) ? () => { } : ((evt) => {
-                    if (evt.key == "Enter" && evt.shiftKey) {
-                        if (evt.type == "keypress") {
-                            pasteIntoInput(this, "\n");
-                        }
-                    } else if (evt.key == "Enter") {
-                        evt.preventDefault();
+        <div className=' m-3 bg-white  p-1 w-full px-2  mx-auto rounded-xl justify-center border border-gray-400 shadow-gray-200 shadow-sm items-end '>
 
-                        handelReq();
-
-                        return;
-                    }
-                })}
-            ></TextareaAutosize>
-
-            <button
-                className='disabled:opacity-50  w-[20px] h-[20px] m-[10px] flex flex-row justify-center items-center'
-                onClick={receiving ? () => { recevingRef.current = false } : () => { handelReq() }} // Call handelReq with trueS
-            >
-                <div
-                    className={'rounded-md p-[3px] ' + ((!loading) ? "bg-black" : "bg-gray-100")}
-
-
-                >
-                    {(!recevingRef.current) ? <svg
-                        width="24"
-                        height="24"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        className={"text-white"}
-                    >
-                        <path
-                            d="M7 11L12 6L17 11M12 18V7"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        ></path>
-                    </svg>
-
-                        : <CirclePause className='text-white' width={24} height={24} />
-                    }
+            {pidList.length > 0 && <div className='p-1 pt-2 overflow-x-scroll flex gap-3'>
+                {pidList.map((pid) => <FileShow key={pid.pid} pid={pid} setPid={setPidList} />)}
+            </div>}
+            <div className='flex'>
+                <div >
+                    <label for="myfile" className='disabled:opacity-50  w-[20px] h-[20px] m-[10px] flex flex-row justify-center items-center'>
+                        <Paperclip />
+                    </label>
+                    <input onChange={sendFile} accept='.rft,.pdf,.txt' name='file' className='hidden' type="file" id="myfile" />
                 </div>
-            </button>
+
+                <TextareaAutosize
+                    placeholder='Type here'
+                    className='w-full disabled:opacity-50  resize-none rounded-lg p-2 focus:outline-none max-h-96'
+                    value={input}
+                    onChange={(e) => { setInput(e.target.value) }}
+                    onKeyDown={(loadingRef.current) ? () => { } : ((evt) => {
+                        if (evt.key == "Enter" && evt.shiftKey) {
+                            if (evt.type == "keypress") {
+                                pasteIntoInput(this, "\n");
+                            }
+                        } else if (evt.key == "Enter") {
+                            evt.preventDefault();
+
+                            handelReq();
+
+                            return;
+                        }
+                    })}
+                ></TextareaAutosize>
+
+                <button
+                    className='disabled:opacity-50  w-[20px] h-[20px] m-[10px] flex flex-row justify-center items-center'
+                    onClick={receiving ? () => { recevingRef.current = false } : () => { handelReq() }} // Call handelReq with trueS
+                >
+                    <div
+                        className={'rounded-md p-[3px] ' + ((!loading) ? "bg-black" : "bg-gray-100")}
+
+
+                    >
+                        {(!recevingRef.current) ? <svg
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            className={"text-white"}
+                        >
+                            <path
+                                d="M7 11L12 6L17 11M12 18V7"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            ></path>
+                        </svg>
+
+                            : <CirclePause className='text-white' width={24} height={24} />
+                        }
+                    </div>
+                </button>
+            </div>
         </div >
     );
 }
@@ -330,17 +409,6 @@ export function ModelSelection({ model, setModel }: { model: string, setModel: R
 }
 
 
-function TestButton() {
-    const [list, setList] = useState<string[]>(["1", "2", "3"])
-    return (
-        <>
-            <div className='overflow-y-scroll h-10' ref={(e) => e?.scrollTo({ top: e.scrollHeight, behavior: "smooth" })}>
-                {list.map((data, index) => <div key={index}>{data}</div>)}
-            </div>
-            <button onClick={() => setList([...list, "4"])} >Add new</button>
-        </>
-    )
-}
 
 
 function Alert({ children }: { childern: Element }) {
@@ -429,16 +497,12 @@ function IntroductionOverlay({ setShow }) {
 
 function App() {
 
-    const [systemPrompt, setSystemPrompt] = useState<string>("")
     const [input, setInput] = useState("")
     const [_, setAlert] = useContext(AlertContext)
     const [intro, setIntro] = useState(false)
     const [tokenPerSec, setTokenPerSec] = useState("NA")
     const [conv, setConv] = useState<conv[]>([
-
         {
-            role: "system", content: systemPrompt
-        }, {
             role: "user", content: "Hello, how are you?"
         }
         , {
@@ -449,18 +513,6 @@ function App() {
     ])
 
     const [model, setModel] = useState<string>("")
-    useEffect(() => {
-        if (intro) return
-        let config = JSON.parse(localStorage.getItem(`config_${model}`) || localStorage.getItem("default"))
-        console.log(config, !config)
-        console.log(localStorage.getItem("defualt"))
-
-        if (!config) {
-
-            setIntro(true)
-        }
-        setSystemPrompt(config?.systemPrompt || "")
-    }, [model, intro])
 
     useEffect(() => {
         if (intro) return
@@ -511,7 +563,8 @@ function App() {
 
                         </div>
                         <div className='absolute bottom-0 w-[55vw] mb-5'>
-                            <Input setConv={setConv}
+                            <Input
+                                setConv={setConv}
                                 setInput={setInput}
                                 input={input}
                                 Conv={conv}

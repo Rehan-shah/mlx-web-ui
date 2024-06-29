@@ -1,20 +1,32 @@
-from typing import List, Optional
+from typing import Dict, List, Literal, Optional,TypedDict, Union
 from huggingface_hub import snapshot_download
-from mlx_lm import generate , load
+from mlx_lm import load , generate 
 from mlx_lm.utils import generate_step
 from pydantic import BaseModel
 import json
+from transformers.pipelines.base import collections
 import uvicorn
 import os
 from fastapi.middleware.cors import CORSMiddleware
 import mlx.core as mx
-from fastapi import FastAPI , Response ,  HTTPException
+from fastapi import FastAPI , Response ,  HTTPException ,Form, File, UploadFile
 from fastapi.responses import StreamingResponse
 import mlx.nn as nn
 from mlx_lm.utils import convert
+from chromadb import Collection, Documents, EmbeddingFunction, Embeddings 
+import chromadb
+from bert_model import load_model
+import cuid
+from PyPDF2 import PdfReader
+import json
+import io
+
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
 
 
 app = FastAPI()
+
 
 
 class ModelLoader():
@@ -38,6 +50,9 @@ class ModelLoader():
         self.path = path
         self.model , self.tokenizer = load(self.path)
 
+
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -46,8 +61,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+class Content(BaseModel):
+    content : str
+    role : str
+
+class Messages(BaseModel):
+    pid:List[str]
+    messages : List[Content]
+
+
 class ModelApi(BaseModel):
-    messages : List[dict]
+    messages : Messages
     model : str 
 
     role_mapping : dict | None   = None 
@@ -73,60 +97,62 @@ async def getModelName(res: Response , path:str|None = "./models"):
 
 def get_stream(prompt:str , model , tokenizer , stream : bool = False ,temp: float = 0.7,repetition_penalty: Optional[float] = None,repetition_context_size: Optional[int] = 20,top_p: float = 1.0  ,max_tokens: int = 256 , stop:Optional[str] = ""):
 
+
+
+
     encoded_prompt = mx.array(tokenizer.encode(prompt))
-    res = ""
-    tokens = []
-    prevLen = 0 
+    detokenizer = tokenizer.detokenizer
+
+    detokenizer.reset()
     for (token, _prob) , n in zip(generate_step(encoded_prompt, model , temp = temp,repetition_penalty = repetition_penalty,repetition_context_size = repetition_context_size,top_p = top_p) , range(max_tokens)):
-
-
-        prevLen = len(res)
-        if  tokenizer.eos_token_id == token:
+        if token == tokenizer.eos_token_id:
             break
-        tokens.append(token)
-        res = tokenizer.decode(tokens)
-
-        if res[prevLen:] == stop:
-            break
-        if  "�" not in res:
-            if stream:
-                yield res[prevLen:] 
-        else :
-            hi , _ = res.split("�")
-            res = hi
-    if stream:
-        return res
-
-
-
-
-@app.get("/test" )
-def test():
-    # os.system("python -m mlx_lm.convert --hf-path mlx-community/Meta-Llama-3-8B-Instruct-4bit --mlx-path ./models/Llama-3-8b-Instruct-Q8 -q --q-bits 1 ")
-    return "test"
-
-
-def convert_chat(messages: List[dict], role_mapping: Optional[dict] = {
-        "bos": "<|begin_of_text|>",
-        "system": "<|start_header_id|>system<|end_header_id|>",
-        "user": "<|start_header_id|>user<|end_header_id|>",
-        "assistant": "<|start_header_id|>assistant<|end_header_id|> ",
-        "eot": "<|eot_id|>",
-        "eos": "<|end_of_text|>",
         
-    }
-) -> str:
+        detokenizer.add_token(token)
+        res = detokenizer.last_segment
+        if res == stop:
+            break
+        yield res
 
-    prompt = ""
+    detokenizer.finalize()
+    yield detokenizer.last_segment
+
+
+
+
+
+def convert_chat(messages: List[Content], role_mapping: Optional[Dict[str, str]] = None) -> str:
+    # Set default role_mapping if not provided
+    if role_mapping is None:
+        role_mapping = {
+            "bos": "",
+            "system": "system",
+            "user": "user",
+            "assistant": "assistant",
+            "eot": "",
+            "eos": ""
+        }
     
-    prompt += role_mapping.get("bos", "")
+    try:
+        prompt = ""
 
-    for line in messages:
-        role_prefix = role_mapping.get(line["role"], "")
-        stop = role_mapping.get("eot", "")
-        content = line.get("content", "")
-        prompt += f"{role_prefix}{content}{stop}"
+        # Add beginning of sequence token if exists
+        prompt += role_mapping.get("bos", "")
 
+        for line in messages:
+            # Get the role prefix and stop token from the mapping
+            role_prefix = role_mapping.get(line.role, "")
+            stop = role_mapping.get("eot", "")
+            content = line.content
+            # Add the role prefix, content, and stop token to the prompt
+            prompt += f"{role_prefix}{content}{stop}"
+
+
+    except Exception as e:
+        print("\n YOO UO U O FE \n")
+        print("Error:", e)
+        return ""
+        # Add the assistant role prefix at the end
     prompt += role_mapping.get("assistant", "")
     return prompt.rstrip()
 
@@ -137,37 +163,122 @@ def convert_chat(messages: List[dict], role_mapping: Optional[dict] = {
 async def check_dir(path:str):
     return os.path.isdir(path)
 
+class ChromaDB():
+    __instance = None
+    
+    # def get_model(self):
+    #     return self.model , self.tokenizer
+
+    @staticmethod
+    def get_chroma():
+        if ChromaDB.__instance is None:
+            ChromaDB.__instance = ChromaDB()
+        return ChromaDB.__instance
+    
+    def __init__(self ) -> None:
+        __instance = None
+
+ChromaDB()
 
 
-@app.post('/v1/chat/completions' )
+class DictType(TypedDict):
+    text: str
+    file_name: str
+    page_number: Union[int, None]
+
+
+class FileAPI(BaseModel):
+    text: List[DictType]
+
+
+class MlX_embedding(EmbeddingFunction):
+
+    def __init__(
+            self,
+            bert_model,
+            weights_path,
+            ) -> None:
+            self.model, self.tokenizer = load_model(bert_model, weights_path)
+            
+    
+    def __call__(self, input: Documents) -> Embeddings:
+        # embed the documents somehow
+        batch = list(input)
+        tokens = self.tokenizer(batch, return_tensors="np", padding=True)
+        tokens = {key: mx.array(v) for key, v in tokens.items()}
+
+        _ , pooled = self.model(**tokens)
+
+        return pooled.tolist()
+
+
+
+
+
+client = chromadb.Client()
+
+collection = client.get_or_create_collection(name="coolmother", embedding_function=MlX_embedding(bert_model="/Users/Rehan/Desktop/coding/mlx-web-ui/backend/models/all-MiniLM-L6-v2", weights_path="/Users/Rehan/Desktop/coding/mlx-web-ui/backend/models/all-MiniLM-L6-v2/model.npz"))
+
+chroma_instances : Dict[str, chromadb.Collection] = {}
+
+
+client = chromadb.Client()
+
+chroma_instances= {}
+
+@app.post('/v1/chat/completions')
 def generate_text(body:ModelApi , res: Response):
 
     # response = generate(model, tokenizer,prompt= convert_chat(body.message) , role_mapping = body.role_mapping  ,temp = body.temp , top_p = body.top_p , max_tokens = body.max_tokens ) 
 
     # response = generate(model, tokenizer, encoded_prompt , role_mapping = body.role_mapping  ,temp = body.temp , top_p = body.top_p , max_tokens = body.max_tokens )
     
+    # print("hi \n\n" , chroma_instances)
     model: nn.Module
     model , tokenizer = ModelLoader.get_instance(body.model).get_model()
     res.headers["Access-Control-Allow-Origin"] = "*"
     stop = None
     prompt = None
+
+    content_list = []
+    if len(body.messages.pid) > 0 :
+        for pid in body.messages.pid:
+            temp_collection = client.get_collection(name=pid)
+            res = temp_collection.query(
+    query_texts=[body.messages.messages[-1].content],
+    n_results=2,
+)  
+            content_list.append(res)
+    
+        content_str = ""
+        for content in content_list:
+            for val, metadata in zip(content["documents"][0], content["metadatas"][0]):
+                content_str += f"{val} \n metadata : {metadata} \n\n"
+        prompt = body.messages.messages[-1].content 
+        body.messages.messages[-1].content = f"""You will receive a question or prompt along with relevant docuemnts. Try to answer the question using the provided documents. You can provided answer with your atomony (without looking at doucments) 
+    -----
+    PROMPT : {prompt}
+    -----
+    DOCUMENTS : {content_str}
+    ---
+    """
     if body.role_mapping != None :
-        prompt= convert_chat(body.messages , role_mapping=body.role_mapping)
+        prompt= convert_chat(body.messages.messages, role_mapping=body.role_mapping)
         stop = body.role_mapping.get("eot", "")
     else:
         try :
             prompt = tokenizer.apply_chat_template(
-                    body.messages, tokenize=False, add_generation_prompt=True
+                    body.messages.messages, tokenize=False, add_generation_prompt=True
                 )
         except Exception as e:
             return HTTPException(status_code=501, detail="Issue while tokenizing: " + str(e) )
-
+            
     if body.stream:
         return StreamingResponse(get_stream(prompt ,  model, tokenizer , stream = body.stream ,temp = body.temp , top_p = body.top_p , max_tokens=body.max_tokens , stop=stop)  , media_type="text/plain") 
 
 
     else:
-        res = generate(model, tokenizer, prompt= prompt  ,temp = body.temp , top_p = body.top_p , max_tokens = body.max_tokens )
+        res = generate(model, tokenizer, prompt=prompt  ,temp = body.temp , top_p = body.top_p , max_tokens = body.max_tokens )
         return {"message" : res}
 
 
@@ -192,7 +303,7 @@ def installModel(body:InstallModel):
         return
     yield "downloading"
     try :
-        snapshot_download( resume_download=True,repo_id=body.hf_path, local_dir=path)
+        snapshot_download(resume_download=True,repo_id=body.hf_path, local_dir=path)
     except Exception as e:
         yield f"error: {e} , Happen when downloading the model"
         return
@@ -209,6 +320,94 @@ def installModel(body:InstallModel):
 @app.post('/add_models')
 def addModels(body:InstallModel):
     return StreamingResponse(installModel(body) , media_type="text/plain")
+
+
+
+
+
+
+
+
+
+
+@app.post("/delete_vdb/")
+def delete_vdb(pid:str):
+    try :
+        client.delete_collection(name=pid)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting collection: {str(e)}")
+
+    return {"message" : "success"}
+
+
+@app.post("/create_vdb/")
+async def testone(file: UploadFile = File(...)):
+    try :
+        filename = file.filename
+        file_extension = filename.split(".")[-1].lower()
+        message: Dict[int, str] = {}
+
+        if file_extension == "pdf":
+            try:
+                contents = await file.read()
+                pdf_file = io.BytesIO(contents)
+                pdf_reader = PdfReader(pdf_file)
+
+
+                for i, page in enumerate(pdf_reader.pages):
+                    text = page.extract_text()
+                    message[i + 1] = text
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Error processing PDF file: {str(e)}")
+        else:
+            try:
+                contents = await file.read()
+                message[0] = contents.decode("utf-8")
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Issue while reading: {str(e)}")
+        
+
+        pid = cuid.slug()
+
+        collection = client.create_collection(name=pid, embedding_function=MlX_embedding(bert_model="/Users/Rehan/Desktop/coding/mlx-web-ui/backend/models/all-MiniLM-L6-v2", weights_path="/Users/Rehan/Desktop/coding/mlx-web-ui/backend/models/all-MiniLM-L6-v2/model.npz"))
+
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+
+            chunk_overlap=200,
+            length_function=len,
+            is_separator_regex=False,
+        )
+
+        metadata_list = []
+        text_list = []
+        ids_list = []
+        for (page_num , text) in message.items():
+            texts = text_splitter.create_documents([text])
+            for i in range(len(texts)):
+                id = f"{page_num}_{i+1}"
+                text_list.append(texts[i].page_content)
+                if page_num == 0:
+                    metadata_list.append({"file_name": filename})
+                else:
+                    metadata_list.append({"page_number": page_num, "file_name": filename})
+                ids_list.append(id)
+            
+        
+
+        collection.upsert(
+            documents=text_list,
+            metadatas=metadata_list,
+            ids=ids_list
+        )
+        
+
+        return {"pid": pid}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+
+
 
 @app.get("/")
 def read_root():

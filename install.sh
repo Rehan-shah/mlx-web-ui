@@ -25,6 +25,14 @@ else
     brew install git
 fi
 
+
+
+if git -v  > /dev/null; then
+    echo "git already installed"
+else
+    brew install git
+fi
+
 # Install Bun if not already installed
 if bun -v  > /dev/null; then
     echo "bun already installed"
@@ -45,6 +53,15 @@ else
     brew install --cask miniconda
     eval "$(conda "shell.$(basename "${SHELL}")" hook)"
 fi
+
+
+if huggingface-cli env > /dev/null; then
+    echo "Huggingface is installed."
+else
+    brew install huggingface-cli
+    huggingface-cli login
+fi
+
 
 # Clone the repository and set up the environment
 git clone https://github.com/Rehan-shah/mlx-web-ui.git 

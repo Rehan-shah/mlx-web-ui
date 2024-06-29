@@ -10,12 +10,12 @@
     "paths": {
       "@/*": ["./src/*"]
     },
+    "jsx": "preserve",
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react",
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
