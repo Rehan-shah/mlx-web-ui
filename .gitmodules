@@ -1,3 +1,0 @@
-[submodule "backend/models/all-MiniLM-L6-v2"]
-	path = backend/models/all-MiniLM-L6-v2
-	url = https://github.com/henrytanner52/all-MiniLM-L6-v2.git
