@@ -138,12 +138,20 @@ function Input({ setInput, setConv, input, Conv, model, setTokenPerSec }:
             if (config == null) {
                 config = defaultConfig
             }
+            const messages = [
+                ...Conv,
+                { role: "user", content: tempInput }
+            ]
+
+            if (config.systemPrompt != "") {
+                messages.unshift({ role: "system", content: config.systemPrompt })
+            }
 
             console.log(Conv)
             const body = {
                 messages: {
                     pid: pidList.map((e) => e.pid),
-                    messages: [{ role: "system", content: config.systemPrompt }, ...Conv, { role: "user", content: tempInput }]
+                    messages: messages
                 },
 
                 model: defaultConfig.path + model,

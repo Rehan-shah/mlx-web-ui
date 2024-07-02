@@ -1,6 +1,6 @@
 from typing import Dict, List, Literal, Optional,TypedDict, Union
 from huggingface_hub import snapshot_download
-from mlx_lm import load , generate 
+from mlx_lm import load , stream_generate 
 from mlx_lm.utils import generate_step
 from pydantic import BaseModel
 import json
@@ -93,32 +93,6 @@ async def getModelName(res: Response , path:str|None = "./models"):
 
 
     return { "models" :[name for name in os.listdir(path) if os.path.isdir(os.path.join(path, name))]}
-
-
-def get_stream(prompt:str , model , tokenizer , stream : bool = False ,temp: float = 0.7,repetition_penalty: Optional[float] = None,repetition_context_size: Optional[int] = 20,top_p: float = 1.0  ,max_tokens: int = 256 , stop:Optional[str] = ""):
-
-
-
-
-    encoded_prompt = mx.array(tokenizer.encode(prompt))
-    detokenizer = tokenizer.detokenizer
-
-    detokenizer.reset()
-    for (token, _prob) , n in zip(generate_step(encoded_prompt, model , temp = temp,repetition_penalty = repetition_penalty,repetition_context_size = repetition_context_size,top_p = top_p) , range(max_tokens)):
-        if token == tokenizer.eos_token_id:
-            break
-        
-        detokenizer.add_token(token)
-        res = detokenizer.last_segment
-        if res == stop:
-            break
-        yield res
-
-    detokenizer.finalize()
-    yield detokenizer.last_segment
-
-
-
 
 
 def convert_chat(messages: List[Content], role_mapping: Optional[Dict[str, str]] = None) -> str:
@@ -224,7 +198,18 @@ chroma_instances : Dict[str, chromadb.Collection] = {}
 
 client = chromadb.Client()
 
+
 chroma_instances= {}
+
+def generate_stream(model: nn.Module, tokenizer, prompt: str, temp: float, top_p: float, max_tokens: int, repetition_penalty: float , stop : str):
+    for n in stream_generate(model, tokenizer, prompt , max_tokens ,temp =  temp, top_p = top_p, repetition_penalty = repetition_penalty):
+
+        if stop is not None:
+            if n is stop:
+                break
+        yield n
+
+
 
 @app.post('/v1/chat/completions')
 def generate_text(body:ModelApi , res: Response):
@@ -274,7 +259,7 @@ def generate_text(body:ModelApi , res: Response):
             return HTTPException(status_code=501, detail="Issue while tokenizing: " + str(e) )
             
     if body.stream:
-        return StreamingResponse(get_stream(prompt ,  model, tokenizer , stream = body.stream ,temp = body.temp , top_p = body.top_p , max_tokens=body.max_tokens , stop=stop)  , media_type="text/plain") 
+        return StreamingResponse( generate_stream(model, tokenizer, prompt=prompt  ,temp = body.temp , top_p = body.top_p , max_tokens = body.max_tokens , repetition_penalty = body.repetition_penalty , stop = stop)   , media_type="text/plain") 
 
 
     else:

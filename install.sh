@@ -19,10 +19,10 @@ else
 fi
 
 # Install Git if not already installed
-if git -v  > /dev/null; then
-    echo "git already installed"
+if git-lfs version  > /dev/null; then
+    echo "git lfs already installed"
 else
-    brew install git
+    brew install git-lfs
 fi
 
 
