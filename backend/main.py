@@ -92,7 +92,7 @@ async def getModelName(res: Response , path:str|None = "./models"):
     res.headers["Access-Control-Allow-Origin"] = "*"
 
 
-    return { "models" :[name for name in os.listdir(path) if os.path.isdir(os.path.join(path, name))]}
+    return { "models" :[name for name in os.listdir(path) if os.path.isdir(os.path.join(path, name)) and not (name ==  "bert models")] }
 
 
 def convert_chat(messages: List[Content], role_mapping: Optional[Dict[str, str]] = None) -> str:
@@ -191,7 +191,7 @@ class MlX_embedding(EmbeddingFunction):
 
 client = chromadb.Client()
 
-collection = client.get_or_create_collection(name="coolmother", embedding_function=MlX_embedding(bert_model="/Users/Rehan/Desktop/coding/mlx-web-ui/backend/models/all-MiniLM-L6-v2", weights_path="/Users/Rehan/Desktop/coding/mlx-web-ui/backend/models/all-MiniLM-L6-v2/model.npz"))
+collection = client.get_or_create_collection(name="coolmother", embedding_function=MlX_embedding(bert_model="./models/bert models/all-MiniLM-L6-v2", weights_path="./models/bert models/all-MiniLM-L6-v2/model.npz"))
 
 chroma_instances : Dict[str, chromadb.Collection] = {}
 
@@ -354,10 +354,10 @@ async def testone(file: UploadFile = File(...)):
 
         pid = cuid.slug()
 
-        collection = client.create_collection(name=pid, embedding_function=MlX_embedding(bert_model="/Users/Rehan/Desktop/coding/mlx-web-ui/backend/models/all-MiniLM-L6-v2", weights_path="/Users/Rehan/Desktop/coding/mlx-web-ui/backend/models/all-MiniLM-L6-v2/model.npz"))
+        collection = client.create_collection(name=pid, embedding_function=MlX_embedding(bert_model="./models/bert models/all-MiniLM-L6-v2", weights_path="./models/bert models/all-MiniLM-L6-v2/model.npz"))
 
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
+            chunk_size=1500,
 
             chunk_overlap=200,
             length_function=len,

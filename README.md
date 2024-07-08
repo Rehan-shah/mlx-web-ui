@@ -47,5 +47,12 @@ To start the server, run:
 sudo bash main.sh
 ```
 
-This will start the web server on `http://localhost:5173`. Open your web browser and navigate to `http://localhost:5173` to access the MLX Web UI.
+This will start the web server on `http://localhost:5173`.The backend is running on port 8000. 
 
+## Troubleshooting
+Try updating the web-ui version and running again. It can be done using this script:
+```
+sudo bash update.sh
+```
+
+If the issue still exists, please open an issue in this repo.

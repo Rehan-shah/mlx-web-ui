@@ -55,12 +55,6 @@ else
 fi
 
 
-if huggingface-cli env > /dev/null; then
-    echo "Huggingface is installed."
-else
-    brew install huggingface-cli
-    huggingface-cli login
-fi
 
 
 # Clone the repository and set up the environment

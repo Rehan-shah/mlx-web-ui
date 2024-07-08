@@ -4,6 +4,7 @@
 # Function to fetch updates and check if there are new commits
 check_git_fetch() {
     #
+    conda init 
     conda activate mlx-backend
     # Fetch updates from the remote repository
 

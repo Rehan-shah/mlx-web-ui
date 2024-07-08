@@ -365,7 +365,6 @@ export function ModelSelection({ model, setModel }: { model: string, setModel: R
             const config = JSON.parse(localStorage.getItem("default") || "{}")
             fetch(URL + `/models?path=${config.path}`, {
                 method: "GET",
-                cache: "force-cache"
             }).then((data) =>
                 data.json().then((data) => {
                     setData(data.models)
@@ -521,6 +520,14 @@ function App() {
     ])
 
     const [model, setModel] = useState<string>("")
+
+    useEffect(() => {
+        let config = localStorage.getItem("default")
+        if (config == null) {
+            setIntro(true)
+        }
+
+    })
 
     useEffect(() => {
         if (intro) return
