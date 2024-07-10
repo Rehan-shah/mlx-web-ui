@@ -2,6 +2,7 @@
 
 Hello, this repo is an easy way to run a web server for MLX. The design is very minimalistic and contains multiple features like:
 
+- Supports **RAG**
 - Tokens per sec info on screen
 - Support for Latex and code formatting (allows to copy the code snippet )
 - Ability to set model params (top p, temp, role mapping...)
@@ -15,12 +16,12 @@ Hello, this repo is an easy way to run a web server for MLX. The design is very 
 And more coming soon like:
 
 - [ ] Multi-model support
-- [ ] RAG and knowledge graph support (chat with large documents )
-
+- [ ] Dark mode
+- [ ] Togglable Sidebar
 
 
 Here is photo of the UI
-![UI look img](./sample.png)
+![UI look img](https://i.ibb.co/nLGJ3Z1/New-Chat-Llama.png)
 
 
 ## Installation
@@ -56,3 +57,9 @@ sudo bash update.sh
 ```
 
 If the issue still exists, please open an issue in this repo.
+
+
+
+## Using RAG
+
+To use rag you could click the paper pin icon in the textbox and then select the file you want to use.
