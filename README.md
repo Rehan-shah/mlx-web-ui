@@ -21,8 +21,7 @@ And more coming soon like:
 
 
 Here is photo of the UI
-![UI look img](https://i.ibb.co/nLGJ3Z1/New-Chat-Llama.png)
-
+![UI look img](https://i.ibb.co/nLGJ3Z1/New-Chat-Llama.png
 
 ## Installation
 
