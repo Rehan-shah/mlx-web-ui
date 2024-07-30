@@ -1,6 +1,8 @@
 
 #!/bin/bash
 
+lsof -i :5173 -i :8000 | awk 'NR>1 {print $2}' | xargs kill -9
+
 bash update.sh
 
 # Initialize conda
