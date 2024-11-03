@@ -50,7 +50,7 @@ function Text({ text, type }: { text: string, type: "user" | "assistant" }) {
     if (type === "user") {
         url = "pf.png"
     } else {
-        url = "https://styles.redditmedia.com/t5_81eyvm/styles/communityIcon_cumnsvx9kzma1.png"
+        url = "ai.png"
     }
     let main = "grid grid-cols-12 justify-items-start mb-8"
 
