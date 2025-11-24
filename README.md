@@ -1,5 +1,4 @@
-> [!NOTE]
-> I've been experiencing an issue with GitHub where my repository stars are being deleted. Despite having **118 stars** for a long time, they seem to be disappearing. I am currently in discussions with GitHub support to resolve this matter. For reference, here's a snapshot from Wayback Machine, a trusted third-party source, showing the proof of my repository's star count: [Wayback Machine Snapshot](https://web.archive.org/web/20241122063326/https://github.com/Rehan-shah/mlx-web-ui).
+
 
 # MLX Web UI
 
