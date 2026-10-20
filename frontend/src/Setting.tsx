@@ -1,263 +1,298 @@
-import React, { useContext, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
-import { Settings, Trash, X } from 'lucide-react';
-import { Option } from './Sidebar';
-import { URL } from './App';
-import { AlertContext } from './App';
+import { Settings as SettingsIcon, X } from 'lucide-react';
+import { checkDir, fetchModels } from './api';
+import { useAlert } from './alert-context';
 import { Switch } from "@/components/ui/switch"
-import { sleep } from 'bun';
+import Option from './components/Option';
+import {
+    DEFAULT_GENERATION,
+    DEFAULT_MODEL_DIR,
+    EMPTY_ROLE_MAPPING,
+    loadDefaultConfig,
+    loadModelConfig,
+    normalizeModelDir,
+    saveDefaultConfig,
+    saveModelConfig,
+} from './lib/config';
+import { clearHfToken, loadHfToken, saveHfToken, useHfToken } from './lib/hfToken';
+import { cn } from './lib/utils';
+import { ROLE_MAPPING_KEYS, type GenerationConfig, type RoleMapping } from './types';
 
-type Role_mappingT = {
-    bos: string,
-    eos: string,
-    system: string,
-    user: string,
-    assistant: string,
-    eot: string,
-}
+type Tab = "default" | "model"
 
-type ModelConfig = {
-    kind: 'model',
-    model: string,
-    show_role_mapping: boolean
-    role_mapping: Role_mappingT,
-    systemPrompt: string,
-    temp: number,
-    top_p: number,
-    max_tokens: number
-}
-
-type PathConfig = {
-    kind: 'path',
+/** Form values; numbers are kept as strings while editing. */
+type FormState = {
     path: string,
-    role_mapping: Role_mappingT,
     systemPrompt: string,
-    temp: number,
-    top_p: number,
-    max_tokens: number
+    temp: string,
+    top_p: string,
+    max_tokens: string,
+    show_role_mapping: boolean,
+    role_mapping: RoleMapping,
 }
 
-type ConfigT = ModelConfig | PathConfig
-let role_mappinglist = ["bos", "eos", "system", "user", "assistant", "eot"]
-const AlertDialogDemo = () => {
-    const [showDefualt, setShowDfualt] = React.useState(false)
-    const [modelList, setModelList] = React.useState([])
-    const [model, setModel] = React.useState("")
+function toForm(config: GenerationConfig, path: string): FormState {
+    return {
+        path,
+        systemPrompt: config.systemPrompt,
+        temp: String(config.temp),
+        top_p: String(config.top_p),
+        max_tokens: String(config.max_tokens),
+        show_role_mapping: config.show_role_mapping,
+        role_mapping: { ...EMPTY_ROLE_MAPPING, ...config.role_mapping },
+    }
+}
+
+const INITIAL_FORM = toForm(DEFAULT_GENERATION, DEFAULT_MODEL_DIR)
+
+const focusRing = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1'
+const fieldClass = cn('outline-none border-black border rounded px-2', focusRing)
+
+function Divider() {
+    return <div className='py-3'><hr /></div>
+}
+
+const Settings = () => {
+    const [tab, setTab] = useState<Tab>("default")
+    const [modelList, setModelList] = useState<string[]>([])
+    const [model, setModel] = useState("")
     const [show, setShow] = useState(false)
-    const [showRoleModeling, setShowRoleModeling] = useState(true)
-    const [_, setAlert] = useContext(AlertContext)
+    const [form, setForm] = useState<FormState>(INITIAL_FORM)
+    const [saving, setSaving] = useState(false)
+    const [hfToken, setHfToken] = useState("")
+    const hasHfToken = useHfToken() !== null
+    const showAlert = useAlert()
+    const showDefault = tab === "default"
 
-    function onSet() {
-        let config: ConfigT = JSON.parse(localStorage.getItem(`config_${model}`))
+    const setField = <K extends keyof FormState>(key: K, value: FormState[K]) =>
+        setForm((prev) => ({ ...prev, [key]: value }))
 
-        if (config === null || showDefualt) {
-            config = JSON.parse(localStorage.getItem("default"))
+    // Load the model list each time the dialog opens.
+    useEffect(() => {
+        if (!show) return
+        const config = loadDefaultConfig()
+        if (config === null) return
+        const controller = new AbortController()
+        fetchModels(config.path, controller.signal)
+            .then((models) => {
+                setModelList(models)
+                setModel((current) => (models.includes(current) ? current : models[0] ?? ""))
+            })
+            .catch((error: unknown) => {
+                if (controller.signal.aborted) return
+                console.error(error)
+                showAlert("Failed to load model, Check console for error")
+            })
+        return () => controller.abort()
+    }, [show, showAlert])
 
+    // Populate the form from storage whenever the dialog, tab or selected model changes.
+    useEffect(() => {
+        if (!show) return
+        const defaults = loadDefaultConfig()
+        const path = defaults?.path ?? DEFAULT_MODEL_DIR
+        const base = defaults ?? DEFAULT_GENERATION
+        const config = showDefault ? base : (model ? loadModelConfig(model) : null) ?? base
+        setForm(toForm(config, path))
+    }, [show, showDefault, model])
+
+    useEffect(() => {
+        if (show) setHfToken(loadHfToken() ?? "")
+    }, [show])
+
+    function parseNumbers(): Pick<GenerationConfig, "temp" | "top_p" | "max_tokens"> | null {
+        const temp = Number(form.temp)
+        const top_p = Number(form.top_p)
+        const max_tokens = Number(form.max_tokens)
+        if (form.temp.trim() === "" || form.top_p.trim() === "" || form.max_tokens.trim() === ""
+            || !Number.isFinite(temp) || !Number.isFinite(top_p) || !Number.isInteger(max_tokens) || max_tokens <= 0) {
+            return null
         }
-        document.getElementById("systemPrompt").value = config.systemPrompt
-        document.getElementById("temp").value = config.temp
-        document.getElementById("top_p").value = config.top_p
-        document.getElementById("max_tokens").value = config.max_tokens
-        setShowRoleModeling(config.show_role_mapping!)
-        if (showDefualt) {
-            document.getElementById("path").value = config.path
-        } else {
-            if (config.show_role_mapping) {
-
-                Object.keys(config.role_mapping).forEach((key: string) => {
-                    document.getElementById(key).value = config.role_mapping[key]
-                })
-            }
-        }
-
+        return { temp, top_p, max_tokens }
     }
 
-
-    async function handleModelChange() {
-        if (showDefualt) {
-            let path = document.getElementById("path")?.value
-        } else {
-            let model = document.getElementById("model")?.value
+    async function handleSave() {
+        const numbers = parseNumbers()
+        if (numbers === null) {
+            showAlert("Temperature, Top P and Max token must be valid numbers")
+            return
         }
 
-        let role_model = {}
-        role_mappinglist.forEach((key: string) => {
-            role_model[key] = document.getElementById(key)?.value
-        })
-        let systemPrompt = document.getElementById("systemPrompt")?.value
-
-        let temp = Number(document.getElementById("temp")?.value)
-
-        let top_p = Number(document.getElementById("top_p")?.value)
-
-        let max_tokens = Number(document.getElementById("max_tokens")?.value)
-
-        if (!showDefualt) {
-
-            // let config: ConfigT = { model: model, systemPrompt: systemPrompt, role_mapping: role_model, temp: temp, top_p: top_p, max_tokens: max_tokens }
-            const config = { path: model, systemPrompt: systemPrompt, temp: temp, top_p: top_p, max_tokens: max_tokens, show_role_mapping: showRoleModeling }
-            if (showRoleModeling) {
-                config["role_mapping"] = role_model
-            }
-            localStorage.setItem(`config_${model}`, JSON.stringify(config))
-        } else {
-
-            const res = await fetch(`${URL}/check_dir?` + new URLSearchParams({ path: path.value }), {
-                method: 'GET',
-            })
-            const pathExist = await res.json()
-            if (!pathExist) {
-                setAlert("Path does not exist , failed to save")
+        if (!showDefault) {
+            if (model === "") {
+                showAlert("No model selected, failed to save")
                 return
             }
-            let config: ConfigT = { path: path.value, systemPrompt: systemPrompt, role_mapping: role_model, temp: temp, top_p: top_p, max_tokens: max_tokens }
-            localStorage.setItem("default", JSON.stringify(config))
+            saveModelConfig(model, {
+                systemPrompt: form.systemPrompt,
+                ...numbers,
+                show_role_mapping: form.show_role_mapping,
+                role_mapping: form.show_role_mapping ? form.role_mapping : undefined,
+            })
+            setShow(false)
+            return
         }
-        setShow(false)
 
-    }
-
-    useEffect(() => {
-        if (show) {
-            (async () => {
-                try {
-                    const config = JSON.parse(localStorage.getItem("default"))
-                    const data = await fetch(`${URL}/models?path=${config.path}`, {
-                        method: 'GET',
-                        cache: "force-cache"
-                    });
-                    const res = await data.json();
-                    setModel(res.models[0]);
-                    setModelList(res.models);
-
-                } catch (error) {
-                    setAlert("Failed to load model, Check console for error")
-                    console.log(error)
-                }
-            })()
-        }
-    }, [show]);
-
-
-    function sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
-
-    useEffect(() => {
-
-        setShowRoleModeling(true)
-        sleep(1).then(() => {
-
-            if (show) {
-                onSet()
+        const path = normalizeModelDir(form.path)
+        setSaving(true)
+        try {
+            if (!(await checkDir(path))) {
+                showAlert("Path does not exist, failed to save")
+                return
             }
-        })
-    }, [show, showDefualt, model])
+            const existing = loadDefaultConfig()
+            saveHfToken(hfToken)
+            saveDefaultConfig({
+                ...existing,
+                path,
+                systemPrompt: form.systemPrompt,
+                ...numbers,
+                // The default tab does not edit role mapping; keep what was stored.
+                show_role_mapping: existing?.show_role_mapping ?? false,
+                role_mapping: existing?.role_mapping,
+            })
+            setShow(false)
+        } catch (error) {
+            console.error(error)
+            showAlert("Unable to reach the backend, check console for details")
+        } finally {
+            setSaving(false)
+        }
+    }
 
-    return (<AlertDialog.Root onOpenChange={setShow} open={show} >
+    return (<AlertDialog.Root onOpenChange={setShow} open={show}>
         <AlertDialog.Trigger asChild>
-            <Option text="Settings" Svg={Settings} />
+            <Option text="Settings" Svg={SettingsIcon} />
         </AlertDialog.Trigger>
         <AlertDialog.Portal>
-            <AlertDialog.Overlay className="bg-blackA6 data-[state=open]:animate-overlayShow bg-black opacity-50 fixed inset-0" />
-            <AlertDialog.Content className="data-[state=open]:animate-contentShow fixed top-[50%] left-[50%] max-h-[85vh] w-[48vw] translate-x-[-50%] translate-y-[-50%] rounded-[6px] bg-white p-2 focus:outline-none">
+            <AlertDialog.Overlay className="data-[state=open]:animate-overlayShow bg-black opacity-50 fixed inset-0" />
+            <AlertDialog.Content
+                aria-describedby={undefined}
+                className="data-[state=open]:animate-contentShow fixed top-[50%] left-[50%] max-h-[85vh] overflow-y-auto w-[48vw] translate-x-[-50%] translate-y-[-50%] rounded-[6px] bg-white p-2 focus:outline-none"
+            >
                 <div className='flex p-4 justify-between'>
-                    <h1 className='text-xl font-bold opacity-70'>Settings</h1>
+                    <AlertDialog.Title className='text-xl font-bold opacity-70'>Settings</AlertDialog.Title>
                     <AlertDialog.Cancel asChild>
-                        <X />
+                        <button type="button" aria-label="Close settings" className={cn('rounded-md p-1 hover:bg-gray-100', focusRing)}><X aria-hidden="true" /></button>
                     </AlertDialog.Cancel>
                 </div>
                 <hr className="h-px my-2 bg-gray-200 border-0 dark:bg-gray-700" />
-                <div className='grid grid-cols-4  p-2 opacity-70 '>
-
-                    <div className='mr-5'>
-                        <h1 role='button' onClick={() => { setShowDfualt(true) }} className={'p-2 hover:bg-gray-100 rounded-md w-full font-semibold ' + (showDefualt ? "bg-gray-100" : "")}>Defualt</h1>
-                        <h1 role='button' onClick={() => { setShowDfualt(false) }} className={'p-2 mt-1 hover:bg-gray-100 rounded-md w-full font-semibold ' + (!showDefualt ? "bg-gray-100" : "")}>Model Spefic </h1>
+                <div className='grid grid-cols-4 p-2 opacity-70'>
+                    <div className='mr-5' role="tablist" aria-label="Settings scope">
+                        <button type="button" role="tab" aria-selected={showDefault} onClick={() => setTab("default")}
+                            className={cn('p-2 hover:bg-gray-100 rounded-md w-full font-semibold text-left', focusRing, showDefault && "bg-gray-100")}>Default</button>
+                        <button type="button" role="tab" aria-selected={!showDefault} onClick={() => setTab("model")}
+                            className={cn('p-2 mt-1 hover:bg-gray-100 rounded-md w-full font-semibold text-left', focusRing, !showDefault && "bg-gray-100")}>Model Specific</button>
                     </div>
 
-                    <div className='col-span-3 pt-2'>
+                    <div className='col-span-3 pt-2' role="tabpanel">
                         <div className='flex justify-between'>
-                            {!showDefualt ? (
+                            {!showDefault ? (
                                 <>
-                                    <h2 className='bold'>Model Name</h2>
-                                    <select id="model" onChange={(e) => {
-                                        setModel(e.target.value)
-                                    }} value={model} className='outline-none px-2'>
-                                        {modelList.map((model) => {
-                                            return <option key={model} value={model}>{model}</option>
-                                        })}
-                                    </select> </>) : (
+                                    <label htmlFor="settings-model" className='bold'>Model Name</label>
+                                    <select id="settings-model" onChange={(e) => setModel(e.target.value)} value={model} title={model}
+                                        className={cn('outline-none px-2 max-w-[60%] truncate rounded', focusRing)}>
+                                        {modelList.map((name) => <option key={name} value={name}>{name}</option>)}
+                                    </select>
+                                </>) : (
                                 <>
-                                    <h2>Model directory</h2>
-                                    <input type="text" id="path" defaultValue={"./models"} className='outline-none border-black border rounded px-2' />
+                                    <label htmlFor="settings-path">Model directory</label>
+                                    <input type="text" id="settings-path" value={form.path}
+                                        onChange={(e) => setField("path", e.target.value)} className={fieldClass} />
                                 </>
-                            )
-                            }
+                            )}
                         </div>
 
-                        <div className='py-3'><hr /></div>
+                        <Divider />
 
-                        <div className='flex justify-between '>
-                            <h2 className='bold'>System Prompt</h2>
-                            <textarea id="systemPrompt" defaultValue={""} className='outline-none border-black border rounded px-2' />
+                        <div className='flex justify-between'>
+                            <label htmlFor="settings-systemPrompt" className='bold'>System Prompt</label>
+                            <textarea id="settings-systemPrompt" value={form.systemPrompt}
+                                onChange={(e) => setField("systemPrompt", e.target.value)} className={fieldClass} />
                         </div>
 
+                        <Divider />
 
-
-                        <div className='py-3'><hr /></div>
-
-                        <div className='flex justify-between '>
-                            <h2 className='bold'>Temperature</h2>
-                            <input type="number" id="temp" defaultValue={0.7} className='outline-none border-black border rounded px-2' />
-                        </div>
-                        <div className='py-3'><hr /></div>
-
-                        <div className='flex justify-between '>
-                            <h2 className='bold'>Top P</h2>
-                            <input type="number" id="top_p" defaultValue={1} className='outline-none border-black border rounded px-2' />
+                        <div className='flex justify-between'>
+                            <label htmlFor="settings-temp" className='bold'>Temperature</label>
+                            <input type="number" step="any" id="settings-temp" value={form.temp}
+                                onChange={(e) => setField("temp", e.target.value)} className={fieldClass} />
                         </div>
 
-                        <div className='py-3'><hr /></div>
+                        <Divider />
 
-                        <div className='flex justify-between '>
-                            <h2 className='bold'>Max token</h2>
-                            <input type="number" id="max_tokens" defaultValue={256} className='outline-none border-black border rounded px-2' />
+                        <div className='flex justify-between'>
+                            <label htmlFor="settings-top_p" className='bold'>Top P</label>
+                            <input type="number" step="any" id="settings-top_p" value={form.top_p}
+                                onChange={(e) => setField("top_p", e.target.value)} className={fieldClass} />
                         </div>
 
-                        <div className='py-3'><hr /></div>
-                        {!showDefualt &&
+                        <Divider />
+
+                        <div className='flex justify-between'>
+                            <label htmlFor="settings-max_tokens" className='bold'>Max token</label>
+                            <input type="number" min={1} step={1} id="settings-max_tokens" value={form.max_tokens}
+                                onChange={(e) => setField("max_tokens", e.target.value)} className={fieldClass} />
+                        </div>
+
+                        <Divider />
+                        {showDefault &&
                             <>
-                                <div className='flex justify-between py-2 '>
-                                    <h2 className='bold'>Enable custom Role mapping</h2>
-                                    <Switch
-                                        checked={showRoleModeling}
-                                        onCheckedChange={setShowRoleModeling}
-                                    />
-
-                                </div>
-                                {showRoleModeling && <>
-                                    <hr />
-                                    <div className='flex justify-between w-full py-2'>
-                                        <h2>Role Modeling</h2>
-                                        <div className='w-50'>
-                                            {role_mappinglist.map((role, i) => {
-                                                return (<div className='grid grid-cols-3 w-50 mb-2' key={i}> <p className='left mr-2'>{role.toUpperCase()}</p> <input type="text" defaultValue="" id={role} className='w-35 col-span-2 border border-black rounded focus:outline-none pd-1' /> </div>)
-                                            })}
-
-                                        </div>
+                                <div className='flex justify-between gap-4'>
+                                    <div>
+                                        <label htmlFor="settings-hf-token">Hugging Face token</label>
+                                        <p className='text-xs opacity-80'>Optional, needed for gated/private models, or if rate-limited. Stored only in this browser.</p>
                                     </div>
+                                    <div className='flex shrink-0 items-start gap-2'>
+                                        <input type="password" id="settings-hf-token" value={hfToken} placeholder="hf_..."
+                                            autoComplete="off" spellCheck={false}
+                                            onChange={(e) => setHfToken(e.target.value)} className={cn(fieldClass, 'w-44')} />
+                                        <button type="button" disabled={!hasHfToken && hfToken === ""}
+                                            onClick={() => { clearHfToken(); setHfToken("") }}
+                                            className={cn('rounded border border-black px-2 text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed', focusRing)}>
+                                            Remove
+                                        </button>
+                                    </div>
+                                </div>
+                                <Divider />
+                            </>}
+                        {!showDefault &&
+                            <>
+                                <div className='flex justify-between py-2'>
+                                    <label htmlFor="settings-role-mapping-toggle" className='bold'>Enable custom Role mapping</label>
+                                    <Switch
+                                        id="settings-role-mapping-toggle"
+                                        checked={form.show_role_mapping}
+                                        onCheckedChange={(checked) => setField("show_role_mapping", checked)}
+                                    />
+                                </div>
+                                {form.show_role_mapping && <>
+                                    <hr />
+                                    <fieldset className='flex justify-between w-full py-2'>
+                                        <legend className='sr-only'>Role mapping</legend>
+                                        <span aria-hidden="true">Role Mapping</span>
+                                        <div className='w-50'>
+                                            {ROLE_MAPPING_KEYS.map((role) => (
+                                                <div className='grid grid-cols-3 w-50 mb-2' key={role}>
+                                                    <label htmlFor={`settings-role-${role}`} className='left mr-2'>{role.toUpperCase()}</label>
+                                                    <input type="text" id={`settings-role-${role}`} value={form.role_mapping[role]}
+                                                        onChange={(e) => setField("role_mapping", { ...form.role_mapping, [role]: e.target.value })}
+                                                        className={cn('w-35 col-span-2 border border-black rounded px-1 focus:outline-none', focusRing)} />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </fieldset>
                                 </>}
                             </>}
 
-
-                        <button onClick={handleModelChange} className='w-full bg-black text-white mt-6 h-10 hover:bg-white hover:text-black hover:border hover:border-black rounded-md'>Save</button>
+                        <button type="button" onClick={() => void handleSave()} disabled={saving}
+                            className={cn('w-full bg-black text-white mt-6 h-10 border border-black hover:bg-white hover:text-black rounded-md disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-black disabled:hover:text-white', focusRing)}>{saving ? "Saving…" : "Save"}</button>
                     </div>
-
                 </div>
-
             </AlertDialog.Content>
         </AlertDialog.Portal>
     </AlertDialog.Root>)
 };
 
-export default AlertDialogDemo;
+export default Settings;

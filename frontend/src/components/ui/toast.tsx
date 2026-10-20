@@ -1,7 +1,7 @@
 import * as React from 'react';
 import * as Toast from '@radix-ui/react-toast';
 
-const ToastDemo = ({ title, open, setOpen }: { title: string, open: boolean, setOpen: React.Dispatch<React.SetStateAction<boolean>> }) => {
+const AlertToast = ({ title, open, setOpen }: { title: string, open: boolean, setOpen: React.Dispatch<React.SetStateAction<boolean>> }) => {
 
 
     return (
@@ -22,4 +22,4 @@ const ToastDemo = ({ title, open, setOpen }: { title: string, open: boolean, set
 };
 
 
-export default ToastDemo;
+export default AlertToast;

@@ -53,4 +53,6 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 )
 Button.displayName = "Button"
 
+// shadcn/ui convention: the variants helper is shared with other ui components.
+// eslint-disable-next-line react-refresh/only-export-components
 export { Button, buttonVariants }

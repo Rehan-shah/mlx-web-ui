@@ -1,20 +1,50 @@
-
 #!/bin/bash
+set -euo pipefail
 
-lsof -i :5173 -i :8000 | awk 'NR>1 {print $2}' | xargs kill -9
+cd "$(dirname "$0")"
 
-bash update.sh
+PID_FILE=".server.pids"
 
-# Initialize conda
+stop_recorded() {
+    [ -f "$PID_FILE" ] || return 0
+    while read -r pid; do
+        [ -n "$pid" ] || continue
+        pkill -TERM -P "$pid" 2>/dev/null || true
+        kill "$pid" 2>/dev/null || true
+    done < "$PID_FILE"
+    rm -f "$PID_FILE"
+}
+
+# Stop servers left over from a previous run of this script (only PIDs we recorded).
+stop_recorded
+
+bash update.sh || echo "Update check failed; continuing with the current version."
+
+# Initialize conda (its activation scripts reference unset variables)
+set +u
 eval "$(conda shell.bash hook)"
 conda activate mlx-backend
+set -u
 
-# Start frontend and backend servers in the same process group
-(cd ./frontend && bun run dev 2> frontend-error.log && echo "started forontend") &
-(cd ./backend && python main.py 2> backend-error.log && echo "started backend") &
-# Open the URL in the default browser
-sleep 5 # Give some time for servers to start
+if [ ! -f "backend/models/bert models/all-MiniLM-L6-v2/model.npz" ]; then
+    echo "Embedding model missing; downloading and converting it..."
+    (cd backend && python convert_bert.py)
+fi
+
+trap 'stop_recorded' EXIT
+trap 'exit 130' INT TERM
+
+echo "Starting frontend (logs: frontend/frontend-error.log)..."
+(cd frontend && exec bun run dev 2> frontend-error.log) &
+echo "$!" >> "$PID_FILE"
+
+echo "Starting backend (logs: backend/backend-error.log)..."
+(cd backend && exec python main.py 2> backend-error.log) &
+echo "$!" >> "$PID_FILE"
+
+# Give the servers some time to start, then open the UI
+sleep 5
 open "http://localhost:5173/"
 
-# Wait for all background jobs to finish (this will capture Ctrl+C)
+# Wait for the servers; Ctrl+C stops both via the EXIT trap
 wait
