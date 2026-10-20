@@ -229,3 +229,29 @@ def test_chat_unknown_pid(client):
 
 def test_delete_vdb_missing(client):
     assert client.post("/delete_vdb/", params={"pid": "doesnotexist"}).status_code == 404
+
+
+@pytest.mark.parametrize("bits", [1, 7, 9, 16, 999])
+def test_add_models_rejects_unsupported_bits(client, bits, monkeypatch):
+    monkeypatch.setattr(main, "snapshot_download", lambda **kw: pytest.fail("should not download"))
+    r = install(client, quantization=bits)
+    assert r.status_code == 400
+    assert "Invalid quantization" in r.json()["detail"]
+
+
+@pytest.mark.parametrize("bits", [2, 3, 4, 5, 6, 8])
+def test_add_models_accepts_supported_bits(client, bits, monkeypatch):
+    monkeypatch.setattr(main, "snapshot_download", lambda **kw: None)
+    monkeypatch.setattr(main, "convert", lambda **kw: None)
+    assert install(client, quantization=bits).text.splitlines()[-1] == "done"
+
+
+def test_add_models_refuses_to_requantize(client, models_dir, monkeypatch):
+    def fake_download(local_dir, **kw):
+        local_dir.mkdir(parents=True, exist_ok=True)
+        (local_dir / "config.json").write_text('{"quantization": {"bits": 4, "group_size": 64}}')
+    monkeypatch.setattr(main, "snapshot_download", fake_download)
+    monkeypatch.setattr(main, "convert", lambda **kw: pytest.fail("should not convert"))
+    lines = install(client, quantization=4).text.splitlines()
+    assert lines[0] == "downloading"
+    assert lines[-1].startswith("error: This model is already quantized")

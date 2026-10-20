@@ -1,3 +1,4 @@
+import json
 import io
 import re
 import threading
@@ -285,6 +286,18 @@ def _status_error(error: Exception, context: str, token: Optional[str]) -> str:
     return f"error: {message} , {context}\n"
 
 
+# Bit widths mlx.core.quantize supports; 1-bit is excluded because the output is unusable.
+ALLOWED_QUANT_BITS = {0, 2, 3, 4, 5, 6, 8}
+
+
+def _is_quantized(model_dir: Path) -> bool:
+    try:
+        config = json.loads((model_dir / "config.json").read_text())
+    except (OSError, ValueError):
+        return False
+    return bool(config.get("quantization") or config.get("quantization_config"))
+
+
 def install_model(target: Path, hf_path: str, bits: int, token: Optional[str] = None) -> Iterator[str]:
     # Each status is newline-terminated so the client can split coalesced chunks.
     try:
@@ -300,6 +313,9 @@ def install_model(target: Path, hf_path: str, bits: int, token: Optional[str] = 
         yield _status_error(e, "Happen when downloading the model", token)
         return
     if bits > 0:
+        if _is_quantized(target):
+            yield "error: This model is already quantized. Pick an unquantized (fp16/bf16) model or set quantization to 0\n"
+            return
         yield "quantazation\n"
         try:
             convert(hf_path=str(target), mlx_path=f"{target}-q{bits}", quantize=True, q_bits=bits)
@@ -314,8 +330,9 @@ def add_models(body: InstallModel):
     name = body.name.strip()
     if not _NAME_RE.match(name):
         raise HTTPException(status_code=400, detail="Invalid model name")
-    if body.quantization < 0:
-        raise HTTPException(status_code=400, detail="Invalid quantization")
+    if body.quantization not in ALLOWED_QUANT_BITS:
+        allowed = ", ".join(str(b) for b in sorted(ALLOWED_QUANT_BITS - {0}))
+        raise HTTPException(status_code=400, detail=f"Invalid quantization: use 0 (none) or one of {allowed} bits")
     target = resolve_in_models_dir(body.model_path) / name
     resolve_in_models_dir(str(target), allow_root=False)
     if body.quantization > 0:

@@ -39,7 +39,10 @@ const PAGE_SIZE = 10
 const focusRing = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1"
 const primaryButton = cn("p-2 bg-fg text-bg rounded-lg w-full text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed", focusRing)
 const secondaryButton = cn("p-2 bg-transparent text-fg rounded-lg w-full text-sm border border-line hover:bg-hover disabled:opacity-50 disabled:cursor-not-allowed", focusRing)
-const inputClass = cn("w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus-visible:border-slate-500", focusRing)
+// Must match ALLOWED_QUANT_BITS in backend/main.py.
+const QUANT_OPTIONS = [0, 2, 3, 4, 5, 6, 8]
+
+const inputClass =cn("w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus-visible:border-slate-500", focusRing)
 
 function useDebounce<T>(value: T, delay: number): T {
     const [debouncedValue, setDebouncedValue] = useState(value);
@@ -294,12 +297,13 @@ function OptionsView({ config, setConfig, onBack, onNext }: OptionsViewProps) {
                     onChange={(e) => setConfig((c) => ({ ...c, name: e.target.value }))} className={inputClass} />
 
                 <label htmlFor="install-quantization">Quantization Bits</label>
-                <input id="install-quantization" placeholder="0 means no quantization"
+                <select id="install-quantization"
                     className={inputClass}
                     value={config.quantization}
-                    type="number"
-                    min={0}
-                    onChange={(e) => setConfig((c) => ({ ...c, quantization: Number(e.target.value) || 0 }))} />
+                    onChange={(e) => setConfig((c) => ({ ...c, quantization: Number(e.target.value) }))}>
+                    {QUANT_OPTIONS.map((bits) =>
+                        <option key={bits} value={bits}>{bits === 0 ? "None" : `${bits}-bit`}</option>)}
+                </select>
 
                 <label htmlFor="install-target-dir">Target Dir</label>
                 <input id="install-target-dir" placeholder="dir path of the model" value={config.target_dir}
