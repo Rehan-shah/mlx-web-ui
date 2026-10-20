@@ -64,20 +64,20 @@ export default function ModelSelection({ model, setModel }: ModelSelectionProps)
             <button
                 ref={toggleRef}
                 type='button'
-                className='flex justify-start rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400'
+                className='flex justify-start rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50'
                 aria-expanded={show}
                 aria-haspopup='listbox'
                 onClick={() => setShow(!show)}
             >
-                <div className='inline-flex flex-row p-2 px-3 items-center gap-1 hover:bg-gray-50 rounded-lg min-w-0'>
-                    <span className="text-sm font-bold opacity-70 text-left truncate max-w-[40vw]" title={label}>
+                <div className='inline-flex flex-row px-2.5 py-1.5 items-center gap-1 hover:bg-hover rounded-lg min-w-0'>
+                    <span className="text-sm font-medium text-left truncate max-w-[40vw]" title={label}>
                         {label}
                     </span>
-                    <svg width="17" height="18" viewBox="0 0 16 17" fill="none" className="text-token-text-tertiary opacity-70 shrink-0" aria-hidden="true"><path d="M11.3346 7.83203L8.00131 11.1654L4.66797 7.83203" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path></svg>
+                    <svg width="17" height="18" viewBox="0 0 16 17" fill="none" className="text-muted shrink-0" aria-hidden="true"><path d="M11.3346 7.83203L8.00131 11.1654L4.66797 7.83203" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path></svg>
                 </div>
             </button>
             {show && (
-                <Command className='w-72 border border-gray-300 shadow-gray-500 shadow-xs h-fit absolute z-10 text-sm'>
+                <Command className='absolute left-0 top-full z-20 mt-1 h-fit w-80 rounded-xl border border-line bg-bg text-sm text-fg shadow-lg'>
                     <CommandInput placeholder="Type the model name..." />
                     <CommandList>
                         {models === null
@@ -86,7 +86,7 @@ export default function ModelSelection({ model, setModel }: ModelSelectionProps)
                                 <CommandEmpty>
                                     {models.length === 0 ? "No models installed yet." : "No matching models."}
                                 </CommandEmpty>
-                                <CommandGroup heading="Suggestions" className='text-left'>
+                                <CommandGroup heading="Installed" className='text-left'>
                                     {models.map((name) => <CommandItem key={name} value={name}
                                         onSelect={() => {
                                             setModel(name)
@@ -99,8 +99,8 @@ export default function ModelSelection({ model, setModel }: ModelSelectionProps)
                     </CommandList>
                     <CommandSeparator />
                     <button type='button' onClick={openInstaller}
-                        className='m-1 rounded-md p-2 text-sm hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400'>
-                        Look in Huggingface 🤗
+                        className='m-1 rounded-md p-2 text-sm text-muted hover:bg-hover hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400'>
+                        Browse Hugging Face models
                     </button>
                 </Command>
             )}

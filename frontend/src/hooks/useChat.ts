@@ -5,7 +5,7 @@ import { loadDefaultConfig, loadModelConfig } from "@/lib/config"
 import { newId } from "@/lib/id"
 import type { ApiMessage, ChatMessage } from "@/types"
 
-const INITIAL_CONVERSATION: ChatMessage[] = [
+export const INITIAL_CONVERSATION: ChatMessage[] = [
     { id: newId(), role: "user", content: "Hello, how are you?" },
     { id: newId(), role: "assistant", content: "I am fine, thank you. How can I help you today?" },
 ]

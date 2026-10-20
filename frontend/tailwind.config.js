@@ -20,6 +20,15 @@ module.exports = {
       },
     },
     extend: {
+      colors: {
+        bg: "rgb(var(--bg) / <alpha-value>)",
+        panel: "rgb(var(--panel) / <alpha-value>)",
+        fg: "rgb(var(--fg) / <alpha-value>)",
+        muted: "rgb(var(--muted) / <alpha-value>)",
+        line: "rgb(var(--line) / <alpha-value>)",
+        hover: "rgb(var(--hover) / <alpha-value>)",
+        accent: "rgb(var(--accent) / <alpha-value>)",
+      },
       keyframes: {
         "accordion-down": {
           from: { height: "0" },

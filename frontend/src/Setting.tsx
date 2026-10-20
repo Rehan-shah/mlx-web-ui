@@ -47,7 +47,7 @@ function toForm(config: GenerationConfig, path: string): FormState {
 const INITIAL_FORM = toForm(DEFAULT_GENERATION, DEFAULT_MODEL_DIR)
 
 const focusRing = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1'
-const fieldClass = cn('outline-none border-black border rounded px-2', focusRing)
+const fieldClass = cn('outline-none border-line border rounded-md bg-transparent px-2 py-1', focusRing)
 
 function Divider() {
     return <div className='py-3'><hr /></div>
@@ -169,21 +169,21 @@ const Settings = () => {
             <AlertDialog.Overlay className="data-[state=open]:animate-overlayShow bg-black opacity-50 fixed inset-0" />
             <AlertDialog.Content
                 aria-describedby={undefined}
-                className="data-[state=open]:animate-contentShow fixed top-[50%] left-[50%] max-h-[85vh] overflow-y-auto w-[48vw] translate-x-[-50%] translate-y-[-50%] rounded-[6px] bg-white p-2 focus:outline-none"
+                className="data-[state=open]:animate-contentShow fixed top-[50%] left-[50%] max-h-[85vh] overflow-y-auto w-[48vw] translate-x-[-50%] translate-y-[-50%] rounded-2xl border border-line bg-bg text-fg shadow-xl p-2 focus:outline-none"
             >
                 <div className='flex p-4 justify-between'>
-                    <AlertDialog.Title className='text-xl font-bold opacity-70'>Settings</AlertDialog.Title>
+                    <AlertDialog.Title className='text-lg font-semibold'>Settings</AlertDialog.Title>
                     <AlertDialog.Cancel asChild>
-                        <button type="button" aria-label="Close settings" className={cn('rounded-md p-1 hover:bg-gray-100', focusRing)}><X aria-hidden="true" /></button>
+                        <button type="button" aria-label="Close settings" className={cn('rounded-md p-1 hover:bg-hover', focusRing)}><X aria-hidden="true" /></button>
                     </AlertDialog.Cancel>
                 </div>
                 <hr className="h-px my-2 bg-gray-200 border-0 dark:bg-gray-700" />
                 <div className='grid grid-cols-4 p-2 opacity-70'>
                     <div className='mr-5' role="tablist" aria-label="Settings scope">
                         <button type="button" role="tab" aria-selected={showDefault} onClick={() => setTab("default")}
-                            className={cn('p-2 hover:bg-gray-100 rounded-md w-full font-semibold text-left', focusRing, showDefault && "bg-gray-100")}>Default</button>
+                            className={cn('p-2 hover:bg-hover rounded-md w-full font-semibold text-left', focusRing, showDefault && "bg-hover")}>Default</button>
                         <button type="button" role="tab" aria-selected={!showDefault} onClick={() => setTab("model")}
-                            className={cn('p-2 mt-1 hover:bg-gray-100 rounded-md w-full font-semibold text-left', focusRing, !showDefault && "bg-gray-100")}>Model Specific</button>
+                            className={cn('p-2 mt-1 hover:bg-hover rounded-md w-full font-semibold text-left', focusRing, !showDefault && "bg-hover")}>Model Specific</button>
                     </div>
 
                     <div className='col-span-3 pt-2' role="tabpanel">
@@ -250,7 +250,7 @@ const Settings = () => {
                                             onChange={(e) => setHfToken(e.target.value)} className={cn(fieldClass, 'w-44')} />
                                         <button type="button" disabled={!hasHfToken && hfToken === ""}
                                             onClick={() => { clearHfToken(); setHfToken("") }}
-                                            className={cn('rounded border border-black px-2 text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed', focusRing)}>
+                                            className={cn('rounded border border-black px-2 text-sm hover:bg-hover disabled:opacity-50 disabled:cursor-not-allowed', focusRing)}>
                                             Remove
                                         </button>
                                     </div>

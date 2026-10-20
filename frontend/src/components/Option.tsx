@@ -6,11 +6,10 @@ type OptionProps = ButtonHTMLAttributes<HTMLButtonElement> & { text: string, Svg
 
 /** Sidebar action button. Forwards ref/props so it can be used with Radix `asChild` triggers. */
 const Option = forwardRef<HTMLButtonElement, OptionProps>(({ text, Svg, className, ...props }, ref) => (
-    <button ref={ref} type="button" {...props} className={cn("flex w-full justify-between rounded-md my-1 bg-[#f9f9f9]", className)}>
-        <span className='flex gap-2 p-2 w-full px-2 hover:bg-gray-200 rounded-md'>
-            <Svg className='w-[1.5rem] h-[1.5rem] opacity-70' aria-hidden="true" />
-            <span className="text-base text-left px-2 opacity-70">{text}</span>
-        </span>
+    <button ref={ref} type="button" {...props}
+        className={cn("flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted hover:bg-hover hover:text-fg", className)}>
+        <Svg className='h-4 w-4' aria-hidden="true" />
+        <span className="text-left">{text}</span>
     </button>
 ))
 Option.displayName = "Option"
