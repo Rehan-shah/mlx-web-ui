@@ -53,6 +53,26 @@ This will start the web server on `http://localhost:5173`. The backend listens o
 
 Models live in `backend/models/` (the default `./models` path in the UI); the backend refuses paths outside that folder. The RAG embedding model (`all-MiniLM-L6-v2`) is downloaded and converted to MLX by the installer; to (re)create it manually run `python convert_bert.py` inside `backend/` with the `mlx-backend` conda env active. Uploaded documents are stored in `backend/chroma_db/`.
 
+## Testing
+
+Backend (mocked model loading/generation, downloads and embeddings; runs offline in about a second):
+
+```bash
+cd backend
+pip install -r requirements.txt -r requirements-dev.txt
+pytest              # add --runslow to also run the real-embedding test (needs converted weights)
+```
+
+Frontend (Vitest + Testing Library + jsdom):
+
+```bash
+cd frontend
+npm ci
+npm test            # also: npm run lint, npm run build
+```
+
+Both suites run in CI via `.github/workflows/test.yml`.
+
 ## Troubleshooting
 Try updating the web-ui version and running again. It can be done using this script:
 ```

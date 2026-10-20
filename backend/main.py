@@ -111,8 +111,23 @@ class MlxEmbedding(EmbeddingFunction):
         return out
 
 
-EMBEDDING_FN = MlxEmbedding(BERT_DIR, BERT_WEIGHTS)
-client = chromadb.PersistentClient(path=str(CHROMA_DIR))
+_embedding_fn: Optional[EmbeddingFunction] = None
+_client = None
+
+
+def get_embedding_fn() -> EmbeddingFunction:
+    """Lazily load the embedding model (keeps imports cheap, e.g. for tests)."""
+    global _embedding_fn
+    if _embedding_fn is None:
+        _embedding_fn = MlxEmbedding(BERT_DIR, BERT_WEIGHTS)
+    return _embedding_fn
+
+
+def get_client():
+    global _client
+    if _client is None:
+        _client = chromadb.PersistentClient(path=str(CHROMA_DIR))
+    return _client
 
 
 class Content(BaseModel):
@@ -190,14 +205,19 @@ def generate_stream(model, tokenizer, prompt: str, max_tokens: int, sampler, log
     for response in stream_generate(
         model, tokenizer, prompt, max_tokens=max_tokens, sampler=sampler, logits_processors=logits_processors
     ):
-        if stop and response.text == stop:
+        text = response.text
+        if stop and stop in text:
+            # The stop marker may arrive alone or inside a larger chunk.
+            head = text.split(stop, 1)[0]
+            if head:
+                yield head
             break
-        yield response.text
+        yield text
 
 
 def get_collection(pid: str):
     try:
-        return client.get_collection(name=pid, embedding_function=EMBEDDING_FN)
+        return get_client().get_collection(name=pid, embedding_function=get_embedding_fn())
     except NotFoundError:
         raise HTTPException(status_code=404, detail=f"Collection {pid} not found")
 
@@ -252,6 +272,8 @@ def generate_text(body: ModelApi):
     text = generate(
         model, tokenizer, prompt, max_tokens=max_tokens, sampler=sampler, logits_processors=logits_processors
     )
+    if stop and stop in text:
+        text = text.split(stop, 1)[0]
     return {"message": text}
 
 
@@ -305,7 +327,7 @@ def add_models(body: InstallModel):
 @app.post("/delete_vdb/")
 def delete_vdb(pid: str):
     try:
-        client.delete_collection(name=pid)
+        get_client().delete_collection(name=pid)
     except NotFoundError:
         raise HTTPException(status_code=404, detail=f"Collection {pid} not found")
     except Exception as e:
@@ -366,7 +388,7 @@ async def create_vdb(file: UploadFile = File(...)):
             raise HTTPException(status_code=400, detail="No extractable text found in file")
 
         pid = cuid.slug()
-        collection = client.create_collection(name=pid, embedding_function=EMBEDDING_FN)
+        collection = get_client().create_collection(name=pid, embedding_function=get_embedding_fn())
         collection.upsert(documents=text_list, metadatas=metadata_list, ids=ids_list)
         return {"pid": pid}
 
@@ -382,4 +404,7 @@ def read_root():
 
 
 if __name__ == "__main__":
+    # Fail fast at startup if the embedding weights are missing.
+    get_embedding_fn()
+    get_client()
     uvicorn.run(app, host="127.0.0.1", port=8000, log_level="info")
