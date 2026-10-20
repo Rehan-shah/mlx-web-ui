@@ -37,8 +37,8 @@ type InstallStatus = "" | "downloading" | "quantazation" | "done" | `error: ${st
 const PAGE_SIZE = 10
 
 const focusRing = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1"
-const primaryButton = cn("p-2 bg-black text-white rounded-md w-full text-sm border border-black hover:bg-white hover:text-black disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-black disabled:hover:text-white", focusRing)
-const secondaryButton = cn("p-2 bg-white text-black rounded-md w-full text-sm border border-black hover:bg-black hover:text-white disabled:opacity-50 disabled:cursor-not-allowed", focusRing)
+const primaryButton = cn("p-2 bg-fg text-bg rounded-lg w-full text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed", focusRing)
+const secondaryButton = cn("p-2 bg-transparent text-fg rounded-lg w-full text-sm border border-line hover:bg-hover disabled:opacity-50 disabled:cursor-not-allowed", focusRing)
 const inputClass = cn("w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm outline-none focus-visible:border-slate-500", focusRing)
 
 function useDebounce<T>(value: T, delay: number): T {
@@ -171,7 +171,7 @@ function HfTokenPrompt({ reason, onDismiss, onSaved }: TokenPromptProps) {
                 <input id={`hf-token-${reason}`} type="password" autoComplete="off" spellCheck={false} placeholder="hf_..."
                     value={value} onChange={(e) => setValue(e.target.value)} className={cn(inputClass, "py-1 text-xs bg-white")} />
                 <button type="submit" disabled={value.trim() === ""}
-                    className={cn("shrink-0 rounded-md bg-black px-3 py-1 text-xs text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed", focusRing)}>
+                    className={cn("shrink-0 rounded-md bg-fg px-3 py-1 text-xs text-bg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed", focusRing)}>
                     {hasToken ? "Replace" : "Save"}
                 </button>
                 {hasToken &&

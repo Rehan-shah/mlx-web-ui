@@ -1,6 +1,6 @@
 import { useState, type ChangeEvent, type KeyboardEvent } from 'react'
 import TextareaAutosize from 'react-textarea-autosize'
-import { CirclePause, Paperclip } from 'lucide-react'
+import { ArrowUp, Paperclip, Square } from 'lucide-react'
 import { createVdb, deleteVdb } from '@/api'
 import { useAlert } from '@/alert-context'
 import { newId } from '@/lib/id'
@@ -75,23 +75,23 @@ export default function ChatInput({ isStreaming, onSend, onStop }: ChatInputProp
         }
     }
 
+    const active = isStreaming || canSend
     return (
-        <div className='m-3 bg-white p-1 w-full px-2 mx-auto rounded-xl justify-center border border-gray-400 shadow-gray-200 shadow-sm items-end'>
-            {files.length > 0 && <div className='p-1 pt-2 overflow-x-scroll flex gap-3'>
+        <div className='w-full rounded-2xl border border-line bg-bg p-2 shadow-[0_2px_12px_-4px_rgb(0_0_0/0.08)] transition-colors focus-within:border-fg/25'>
+            {files.length > 0 && <div className='flex gap-2 overflow-x-auto p-1 pb-2'>
                 {files.map((file) => <FileShow key={file.id} file={file} onRemove={removeFile} />)}
             </div>}
-            <div className='flex'>
-                <div>
-                    <label htmlFor={FILE_INPUT_ID} aria-label='Attach a file' className='cursor-pointer w-[20px] h-[20px] m-[10px] flex flex-row justify-center items-center'>
-                        <Paperclip aria-hidden='true' />
-                    </label>
-                    <input onChange={handleFileChange} accept='.rtf,.pdf,.txt' name='file' className='hidden' type="file" id={FILE_INPUT_ID} />
-                </div>
+            <div className='flex items-end gap-1'>
+                <label htmlFor={FILE_INPUT_ID} aria-label='Attach a file' title='Attach a file'
+                    className='flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-muted hover:bg-hover hover:text-fg'>
+                    <Paperclip className='h-4 w-4' aria-hidden='true' />
+                </label>
+                <input onChange={handleFileChange} accept='.rtf,.pdf,.txt' name='file' className='hidden' type="file" id={FILE_INPUT_ID} />
 
                 <TextareaAutosize
-                    placeholder='Type here'
+                    placeholder='Message…'
                     aria-label='Message'
-                    className='w-full disabled:opacity-50 resize-none rounded-lg p-2 focus:outline-none max-h-96'
+                    className='max-h-72 w-full resize-none bg-transparent px-1 py-[7px] text-[15px] placeholder:text-muted focus:outline-none disabled:opacity-50'
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
@@ -100,17 +100,14 @@ export default function ChatInput({ isStreaming, onSend, onStop }: ChatInputProp
                 <button
                     type='button'
                     aria-label={isStreaming ? 'Stop generating' : 'Send message'}
-                    disabled={!isStreaming && !canSend}
-                    className='disabled:opacity-50 w-[20px] h-[20px] m-[10px] flex flex-row justify-center items-center'
+                    disabled={!active}
+                    className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors',
+                        active ? 'bg-fg text-bg hover:opacity-90' : 'bg-hover text-muted')}
                     onClick={isStreaming ? onStop : () => void send()}
                 >
-                    <div className={cn('rounded-md p-[3px]', isStreaming || canSend ? "bg-black" : "bg-gray-100")}>
-                        {isStreaming
-                            ? <CirclePause className='text-white' width={24} height={24} aria-hidden='true' />
-                            : <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white" aria-hidden="true">
-                                <path d="M7 11L12 6L17 11M12 18V7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path>
-                            </svg>}
-                    </div>
+                    {isStreaming
+                        ? <Square className='h-3.5 w-3.5 fill-current' aria-hidden='true' />
+                        : <ArrowUp className='h-4 w-4' aria-hidden='true' />}
                 </button>
             </div>
         </div>

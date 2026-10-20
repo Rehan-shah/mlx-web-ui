@@ -28,33 +28,33 @@ export default function IntroductionOverlay({ onDone }: { onDone: () => void }) 
 
     return (
         <div className="fixed inset-0 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="intro-title">
-            <div className="absolute inset-0 bg-black opacity-50 pointer-events-none"></div>
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-none"></div>
             <form
-                className="w-1/3 p-8 bg-white rounded-lg drop-shadow-md z-100 relative"
+                className="relative w-full max-w-md rounded-2xl border border-line bg-bg p-8 text-left text-fg shadow-xl"
                 onSubmit={(e) => { e.preventDefault(); void submit() }}
             >
-                <h1 id="intro-title" className="text-2xl font-bold">Welcome to MLX web ui</h1>
-                <p className="text-sm py-2">
+                <h1 id="intro-title" className="text-xl font-semibold tracking-tight">Welcome to MLX Chat</h1>
+                <p className="py-1 text-sm text-muted">
                     Before starting, please enter your folder path where your models are saved/will be saved.
                     If you enter a relative path, make it relative to the backend folder in the mlx-web-ui folder.
                 </p>
-                <p className="text-sm py-2">
+                <p className="py-1 text-sm text-muted">
                     ./models is the default dir, you can continue with that.
                 </p>
-                <div className="py-4"></div>
+                <div className="py-2"></div>
                 <label htmlFor="intro-model-dir" className="sr-only">Model directory</label>
                 <input
                     id="intro-model-dir"
                     value={path}
                     onChange={(e) => setPath(e.target.value)}
                     placeholder="Enter your path"
-                    className="w-72 h-12 rounded p-2 mb-4 z-100 relative pointer-events-auto focus:outline-none"
+                    className="mb-3 h-10 w-full rounded-lg border border-line bg-transparent px-3 text-sm focus:border-accent focus:outline-none"
                     type="text"
                 />
                 <button
                     type="submit"
                     disabled={checking}
-                    className="bg-black text-white rounded text-md p-1 z-100 relative pointer-events-auto disabled:opacity-50"
+                    className="w-full rounded-lg bg-fg py-2 text-sm font-medium text-bg hover:opacity-90 disabled:opacity-50"
                 >
                     Submit
                 </button>
