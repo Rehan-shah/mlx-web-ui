@@ -108,7 +108,7 @@ const EXAMPLES = [
     "Draft a polite follow-up email",
 ]
 
-function EmptyState({ onPick, disabled }: { onPick: (prompt: string) => void, disabled: boolean }) {
+export function EmptyState({ onPick, disabled }: { onPick: (prompt: string) => void, disabled: boolean }) {
     return (
         <div className='flex min-h-[55vh] flex-col items-center justify-center text-center'>
             <div className='mb-4 flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-panel'>
