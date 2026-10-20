@@ -27,12 +27,12 @@ Here is photo of the UI
 
 ## Installation
 
-No pre-requisites or dependencies needed.
+Requires macOS on Apple silicon (arm64). The installer sets up Homebrew, Python, Git, Bun and Miniconda if they are missing.
 
-You would only need to run this command to install:
+Run this command (without `sudo`) to install:
 
 ```bash
-bash -c "$(curl -s https://raw.githubusercontent.com/Rehan-shah/mlx-web-ui/main/install.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/Rehan-shah/mlx-web-ui/main/install.sh)"
 ```
 
 ## Getting Started
@@ -46,15 +46,37 @@ cd mlx-web-ui
 To start the server, run:
 
 ```
-sudo bash main.sh
+bash main.sh
 ```
 
-This will start the web server on `http://localhost:5173`.The backend is running on port 8000. 
+This will start the web server on `http://localhost:5173`. The backend listens on `http://127.0.0.1:8000` (localhost only).
+
+Models live in `backend/models/` (the default `./models` path in the UI); the backend refuses paths outside that folder. The RAG embedding model (`all-MiniLM-L6-v2`) is downloaded and converted to MLX by the installer; to (re)create it manually run `python convert_bert.py` inside `backend/` with the `mlx-backend` conda env active. Uploaded documents are stored in `backend/chroma_db/`.
+
+## Testing
+
+Backend (mocked model loading/generation, downloads and embeddings; runs offline in about a second):
+
+```bash
+cd backend
+pip install -r requirements.txt -r requirements-dev.txt
+pytest              # add --runslow to also run the real-embedding test (needs converted weights)
+```
+
+Frontend (Vitest + Testing Library + jsdom):
+
+```bash
+cd frontend
+npm ci
+npm test            # also: npm run lint, npm run build
+```
+
+Both suites run in CI via `.github/workflows/test.yml`.
 
 ## Troubleshooting
 Try updating the web-ui version and running again. It can be done using this script:
 ```
-sudo bash update.sh
+bash update.sh
 ```
 
 If the issue still exists, please open an issue in this repo.

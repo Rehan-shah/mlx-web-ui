@@ -1,4 +1,3 @@
-
 import argparse
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -128,6 +127,9 @@ def load_model(
     # create and update the model
     model = Bert(config)
     model.load_weights(weights_path)
+    # Materialize weights now so later calls from other threads do not depend
+    # on this thread's (lazy) load stream.
+    mx.eval(model.parameters())
 
     tokenizer = AutoTokenizer.from_pretrained(bert_model)
 

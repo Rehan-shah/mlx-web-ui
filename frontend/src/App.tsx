@@ -1,614 +1,136 @@
 import { useEffect, useRef, useState } from 'react'
-import './App.css'
-import React from 'react'
-import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-    CommandSeparator,
-} from "@/components/ui/command"
-import CodeBlock from './CodeBlock';
-import TextareaAutosize from 'react-textarea-autosize';
-import Sidebar from './Sidebar';
-import { createContext, useContext } from 'react';
-export const AlertContext = createContext(null);
-
+import { Moon, PanelLeft, Sparkles, Sun } from 'lucide-react'
 import 'katex/dist/katex.min.css'
-import { CirclePause, Paperclip, PaperclipIcon, Pin } from 'lucide-react';
-
-export type conv = { role: "system" | "user" | "assistant", content: string }
-
-import Markdown from 'react-markdown'
-import AlertToast from './components/ui/toast';
-import Installtion from './Installtion';
-
-import rehypeKatex from 'rehype-katex'
-import remarkMath from 'remark-math'
-import FileShow from './components/file_show';
-export const URL = "http://127.0.0.1:8000"
-
-const headers = {
-    'Content-Type': 'application/json',
-}
-
-
-
-export type pidT = {
-    pid: null | string,
-    filename: string,
-    size: number,
-    type: string
-}
-
-function Text({ text, type }: { text: string, type: "user" | "assistant" }) {
-
-    let url = ""
-
-    if (type === "user") {
-        url = "pf.png"
-    } else {
-        url = "ai.png"
-    }
-    let main = "grid grid-cols-12 justify-items-start mb-8"
-
-    if (type === "assistant") {
-        main += " grid-row-3"
-    } else {
-        main += " grid-row-2"
-    }
-
-    return (
-        <div className={main}>
-
-            <div className=' justify-self-end  mr-3 '>
-                <img
-                    src={url}
-                    width={25}
-                    className='rounded-full '
-                />
-            </div>
-            <p className='text-left align-middle col-span-11 font-bold '>{type}</p>
-            <div />
-            <Markdown className='col-span-11 text-left text-sm  w-full text-wrap'
-                remarkPlugins={[remarkMath]}
-                rehypePlugins={[rehypeKatex]}
-                components={{ code: CodeBlock }}
-            >{text}</Markdown>
-            <div></div>
-            {type === "assistant" && <button className='mt-2 hover:opacity-100 opacity-20' onClick={() => navigator.clipboard.writeText(text)}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="icon-md"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 3.5C10.8954 3.5 10 4.39543 10 5.5H14C14 4.39543 13.1046 3.5 12 3.5ZM8.53513 3.5C9.22675 2.3044 10.5194 1.5 12 1.5C13.4806 1.5 14.7733 2.3044 15.4649 3.5H17.25C18.9069 3.5 20.25 4.84315 20.25 6.5V18.5C20.25 20.1569 19.1569 21.5 17.25 21.5H6.75C5.09315 21.5 3.75 20.1569 3.75 18.5V6.5C3.75 4.84315 5.09315 3.5 6.75 3.5H8.53513ZM8 5.5H6.75C6.19772 5.5 5.75 5.94772 5.75 6.5V18.5C5.75 19.0523 6.19772 19.5 6.75 19.5H17.25C18.0523 19.5 18.25 19.0523 18.25 18.5V6.5C18.25 5.94772 17.8023 5.5 17.25 5.5H16C16 6.60457 15.1046 7.5 14 7.5H10C8.89543 7.5 8 6.60457 8 5.5Z" fill="currentColor"></path></svg></button>}
-
-        </div>
-
-    )
-}
-
-function Input({ setInput, setConv, input, Conv, model, setTokenPerSec }:
-
-    {
-        setInput: React.Dispatch<React.SetStateAction<string>>,
-        setConv: React.Dispatch<React.SetStateAction<conv[]>>,
-        input: string,
-        Conv: conv[],
-        model: string,
-        setTokenPerSec: React.Dispatch<React.SetStateAction<string>>
-    }) {
-
-    const loadingRef = useRef(false)
-    const [loading, setLoading] = useState(false)
-    const recevingRef = useRef(false)
-    const [receiving, setReceiving] = useState(false)
-    const [pidList, setPidList] = useState<pidT[]>([])
-    useEffect(() => {
-        setReceiving(recevingRef.current)
-        console.log(recevingRef.current)
-    }, [recevingRef.current])
-
-    function pasteIntoInput(el, text) {
-        el.focus();
-        if (typeof el.selectionStart == "number"
-            && typeof el.selectionEnd == "number") {
-            var val = el.value;
-            var selStart = el.selectionStart;
-            el.value = val.slice(0, selStart) + text + val.slice(el.selectionEnd);
-            el.selectionEnd = el.selectionStart = selStart + text.length;
-        } else if (typeof document.selection != "undefined") {
-            var textRange = document.selection.createRange();
-            textRange.text = text;
-            textRange.collapse(false);
-            textRange.select();
-        }
-    }
-
-    const [_, setAlert] = useContext(AlertContext)
-
-    const abortController = new AbortController();
-    const handelReq = async () => {
-
-        setLoading(true)
-        setConv([...Conv, { role: "user", content: input }]);
-        let tempInput = input;
-        setInput("");
-        setConv((prevCon) => [...prevCon, { role: "assistant", content: "Loading ..." }]);
-        try {
-            let config = JSON.parse(localStorage.getItem(`config_${model}`));
-            let defaultConfig = JSON.parse(localStorage.getItem("default"));
-            if (config == null) {
-                config = defaultConfig
-            }
-            const messages = [
-                ...Conv,
-                { role: "user", content: tempInput }
-            ]
-
-            if (config.systemPrompt != "") {
-                messages.unshift({ role: "system", content: config.systemPrompt })
-            }
-
-            console.log(Conv)
-            const body = {
-                messages: {
-                    pid: pidList.map((e) => e.pid),
-                    messages: messages
-                },
-
-                model: defaultConfig.path + model,
-                stream: true,
-                max_tokens: config.max_tokens,
-                temp: config.temp,
-                top_p: config.top_p,
-            };
-
-
-            if (config.show_role_mapping) {
-                body["role_mapping"] = config.role_mapping;
-            }
-
-            const response = await fetch("http://localhost:8000/v1/chat/completions", {
-                method: "POST",
-                signal: abortController.signal,
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(body)
-            });
-
-
-            if (response.body === null) {
-                return;
-            }
-            const reader = response.body
-                .pipeThrough(new TextDecoderStream())
-                .getReader();
-            setConv((preConv) => {
-                return [...preConv, { role: "assistant", content: "" }];
-            });
-            let assistantResponse = "";
-
-            setConv((prevCon) => prevCon.slice(0, -1));
-            let i = 0
-            let midTime = 0
-            let endTime = 0
-            while (true) {
-
-                if (i < 1) {
-                    midTime = Date.now()
-                    setLoading(false)
-                    recevingRef.current = true
-                }
-
-                let { value, done } = await reader.read();
-
-                i++
-                if (value?.includes("status_code")) {
-                    console.error(JSON.parse(value));
-                    throw new Error("value");
-                }
-
-                if (!recevingRef.current) {
-                    abortController.abort();
-                    endTime = Date.now()
-                    break;
-                }
-                if (done) {
-
-                    endTime = Date.now()
-                    recevingRef.current = false
-
-                    break;
-                }
-
-                assistantResponse += value;
-                setConv((preConv) => [...preConv.slice(0, -1), { role: "assistant", content: assistantResponse }]);
-            }
-            setTokenPerSec((i / ((endTime - midTime) / 1000)).toFixed(1))
-
-        } catch (error) {
-            setAlert("unable to send request , check console logs for more info");
-            console.error("Error while fetching:", error.message);
-            setLoading(false)
-            recevingRef.current = false
-            setConv((prevCon) => prevCon.slice(0, -2));
-        }
-    };
-
-
-
-    async function sendFile(e: React.ChangeEvent<HTMLInputElement>) {
-
-        const fileInput = e.target;
-        const file = fileInput.files && fileInput.files[0];
-        if (!file) return;
-        const pid_of_file: pidT = { pid: null, filename: file.name, size: file.size, type: file.name.split(".").at(-1) }
-        setPidList(
-            (e) => [...e, pid_of_file]
-        )
-        setLoading(true)
-
-
-
-        if (!file) return; // or handle the error however you like
-
-        const formData = new FormData();
-        formData.append("file", file);
-
-        let res = await fetch(URL + "/create_vdb", {
-            method: "POST",
-            body: formData,
-        });
-
-        if (!res.ok) {
-            setAlert("unable to process file , check console logs for more info");
-            setPidList(
-                (e) => e.toSpliced(e.length - 1, 1)
-            )
-            console.error("Error while fetching:", await res.text());
-            return
-        }
-
-        const json_parsed = await res.json()
-
-        pid_of_file.pid = json_parsed.pid
-        setPidList(
-            (e) => {
-                return [...e.toSpliced(e.length - 1, 1), pid_of_file]
-
-            }
-
-        )
-
-
-        setLoading(false)
-
-    }
-
-    return (
-        <div className=' m-3 bg-white  p-1 w-full px-2  mx-auto rounded-xl justify-center border border-gray-400 shadow-gray-200 shadow-sm items-end '>
-
-            {pidList.length > 0 && <div className='p-1 pt-2 overflow-x-scroll flex gap-3'>
-                {pidList.map((pid) => <FileShow key={pid.pid} pid={pid} setPid={setPidList} />)}
-            </div>}
-            <div className='flex'>
-                <div >
-                    <label for="myfile" className='disabled:opacity-50  w-[20px] h-[20px] m-[10px] flex flex-row justify-center items-center'>
-                        <Paperclip />
-                    </label>
-                    <input onChange={sendFile} accept='.rft,.pdf,.txt' name='file' className='hidden' type="file" id="myfile" />
-                </div>
-
-                <TextareaAutosize
-                    placeholder='Type here'
-                    className='w-full disabled:opacity-50  resize-none rounded-lg p-2 focus:outline-none max-h-96'
-                    value={input}
-                    onChange={(e) => { setInput(e.target.value) }}
-                    onKeyDown={(loadingRef.current) ? () => { } : ((evt) => {
-                        if (evt.key == "Enter" && evt.shiftKey) {
-                            if (evt.type == "keypress") {
-                                pasteIntoInput(this, "\n");
-                            }
-                        } else if (evt.key == "Enter") {
-                            evt.preventDefault();
-
-                            handelReq();
-
-                            return;
-                        }
-                    })}
-                ></TextareaAutosize>
-
-                <button
-                    className='disabled:opacity-50  w-[20px] h-[20px] m-[10px] flex flex-row justify-center items-center'
-                    onClick={receiving ? () => { recevingRef.current = false } : () => { handelReq() }} // Call handelReq with trueS
-                >
-                    <div
-                        className={'rounded-md p-[3px] ' + ((!loading) ? "bg-black" : "bg-gray-100")}
-
-
-                    >
-                        {(!recevingRef.current) ? <svg
-                            width="24"
-                            height="24"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            className={"text-white"}
-                        >
-                            <path
-                                d="M7 11L12 6L17 11M12 18V7"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            ></path>
-                        </svg>
-
-                            : <CirclePause className='text-white' width={24} height={24} />
-                        }
-                    </div>
-                </button>
-            </div>
-        </div >
-    );
-}
-
-
-
-export function ModelSelection({ model, setModel }: { model: string, setModel: React.Dispatch<React.SetStateAction<string>> }) {
-
-    const [show, setShow] = useState(false)
-    const [_, setAlert] = useContext(AlertContext)
-    const [data, setData] = useState<string[]>([])
-
-    useEffect(() => {
-        if (show) {
-            const config = JSON.parse(localStorage.getItem("default") || "{}")
-            fetch(URL + `/models?path=${config.path}`, {
-                method: "GET",
-            }).then((data) =>
-                data.json().then((data) => {
-                    setData(data.models)
-                })).catch((err) => {
-                    setAlert("Failed to fetch models check console for details")
-                })
-        }
-    }, [show])
-
-
-    return (
-        <>
-            <button className='flex justify-start focus:outline-none' onClick={() => setShow(!show)}>
-                <div className='inline-flex  flex-row p-2 px-3 items-center gap-1 hover:bg-gray-50 rounded-lg '>
-
-                    <h1 className="text-sm font-bold opacity-70 text-left ">
-                        {!!model ? model : "No Model Selected"}
-                    </h1>
-
-                    <svg width="17" height="18" viewBox="0 0 16 17" fill="none" className="text-token-text-tertiary opacity-70"><path d="M11.3346 7.83203L8.00131 11.1654L4.66797 7.83203" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path></svg>
-
-                </div>
-            </button>
-            {show && (
-                <Command open={show} onClose={() => setShow(false)} className='w-72  border border-gray-300 shadow-gray-500 shadow-xs h-fit absolute z-10 text-sm'>
-                    <CommandInput placeholder="Type the model name..." />
-                    <CommandList>
-                        <CommandEmpty>
-                            <p>No results found</p>
-                            <Installtion />
-                        </CommandEmpty>
-                        {!!data ? <CommandGroup heading="Suggestions" className='text-left'>
-                            {data.map((data, index) => <CommandItem key={index}
-                                onSelect={() => {
-                                    setModel(data)
-                                    setShow(false)
-                                }
-                                }>{data}</CommandItem>)}
-
-                        </CommandGroup> :
-                            <CommandItem>Loading...</CommandItem>}
-                        <CommandSeparator />
-                    </CommandList>
-                </Command >
-            )
-            }
-        </>
-    )
-}
-
-
-
-
-function Alert({ children }: { childern: Element }) {
-    const [alert, setAlert] = useState("")
-    const [open, setOpen] = useState(false)
-    useEffect(() => {
-        if (alert !== "") {
-            setOpen(true)
-            setTimeout(() => {
-                setOpen(false)
-                setAlert("")
-            }, 3000)
-        }
-    }, [alert])
-    return (
-        <>
-            <AlertContext.Provider value={[alert, setAlert]}>
-
-                <AlertToast open={open} setOpen={setOpen} title={alert}></AlertToast>
-
-                {children}
-            </AlertContext.Provider >
-        </>
-    )
-}
-
-
-
-function IntroductionOverlay({ setShow }) {
-    const inputRef = useRef(null);
-    const [_, setAlert] = useContext(AlertContext);
-    const dir = {
-        path: "./models",
-        systemPrompt: "A chat between a curious user and an artificial intelligence assistant. The assistant follows the given rules no matter what.",
-        temp: 0.7,
-        top_p: 1,
-        max_tokens: 256,
-        show_role_mapping: false
-    };
-
-    return (
-        <div className="fixed inset-0 flex items-center justify-center z-50">
-            <div className="absolute inset-0 bg-black opacity-50 pointer-events-none"></div>
-            <div className="w-1/3 p-8 bg-white rounded-lg drop-shadow-md z-100 relative">
-                <h1 className="text-2xl font-bold">Welcome to MLX web ui</h1>
-                <p className="text-sm py-2">
-                    Before starting, please enter your folder path where your models are saved/will be saved.
-                    If you enter a relative path, make it relative to the backend folder in the mlx-web-ui folder.
-                    <br />
-                    <p>
-                        ./models is the defualt dir , u can countuine with that
-                    </p>
-                </p>
-                <div className="py-4"></div>
-                <input
-                    ref={inputRef}
-                    defaultValue={"./models"}
-                    placeholder="Enter your path"
-                    className="w-72 h-12 rounded p-2 mb-4 z-100 relative pointer-events-auto focus:outline-none"
-                    type="text"
-                />
-                <button
-                    className="bg-black text-white rounded text-md p-1 z-100 relative pointer-events-auto"
-                    onClick={async () => {
-                        const res = await fetch("http://localhost:8000/check_dir?path=" + (inputRef.current?.value || ""), {});
-                        let isDir = (await res.json())
-                        if (!isDir) {
-                            setAlert("Invalid path, please try again");
-                        } else {
-                            let value = (inputRef.current?.value || "").trim()
-                            if (!value.endsWith("/")) value += "/"
-                            dir.path = value;
-
-                            localStorage.setItem("default", JSON.stringify(dir));
-                            setShow(false);
-                            console.log("saved");
-                        }
-                    }}
-                >
-                    Submit
-                </button>
-            </div>
-        </div>
-    );
-}
+import './App.css'
+import { fetchModels } from './api'
+import { useAlert } from './alert-context'
+import AlertProvider from './components/AlertProvider'
+import ChatInput from './components/ChatInput'
+import ChatMessage from './components/ChatMessage'
+import IntroductionOverlay from './components/IntroductionOverlay'
+import ModelSelection from './components/ModelSelection'
+import { INITIAL_CONVERSATION, useChat } from './hooks/useChat'
+import { loadDefaultConfig } from './lib/config'
+import { cn } from './lib/utils'
+import Sidebar from './Sidebar'
+import { useTheme } from './lib/theme'
 
 function App() {
-
-    const [input, setInput] = useState("")
-    const [_, setAlert] = useContext(AlertContext)
-    const [intro, setIntro] = useState(false)
-    const [tokenPerSec, setTokenPerSec] = useState("NA")
-    const [conv, setConv] = useState<conv[]>([
-        {
-            role: "user", content: "Hello, how are you?"
-        }
-        , {
-            role: "assistant",
-            content: "I am fine, thank you. How can I help you today?"
-
-        }
-    ])
-
-    const [model, setModel] = useState<string>("")
+    const showAlert = useAlert()
+    const [intro, setIntro] = useState(() => loadDefaultConfig() === null)
+    const [model, setModel] = useState("")
+    const { conv, setConv, isStreaming, pendingId, tokenPerSec, send, stop } = useChat(model)
+    const { theme, toggle } = useTheme()
+    const [sidebarOpen, setSidebarOpen] = useState(true)
+    const scrollRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
-        let config = localStorage.getItem("default")
-        if (config == null) {
-            setIntro(true)
-        }
+        scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" })
+    }, [conv])
 
-    })
-
+    // Pick the first available model once setup is complete.
     useEffect(() => {
         if (intro) return
-        (async () => {
-            try {
-                let config = JSON.parse(localStorage.getItem("default"))
-                const data = await fetch(`${URL}/models?path=${config.path}`, {
-                    method: 'GET',
-                });
-                const res = await data.json();
+        const config = loadDefaultConfig()
+        if (config === null) return
+        const controller = new AbortController()
+        fetchModels(config.path, controller.signal)
+            .then((models) => {
+                if (models.length > 0) setModel((current) => current || models[0])
+            })
+            .catch((error: unknown) => {
+                if (controller.signal.aborted) return
+                console.error(error)
+                showAlert("Failed to load model, Check console for error")
+            })
+        return () => controller.abort()
+    }, [intro, showAlert])
 
-                if (!res) {
-                    return "";
-                }
-                setModel(res.models[0]);
-            } catch (error) {
-
-                setAlert("Failed to load model, Check console for error")
-                console.log(error)
-            }
-        })()
-
-    }, [intro]);
-
-
+    // The seeded greeting stays in context as a few-shot example but is not shown.
+    const visible = conv.filter((m) => m.role !== "system" && !SEED_IDS.has(m.id))
 
     return (
-        <div>
-            {intro && <IntroductionOverlay setShow={setIntro} />}
-            <div className={'flex h-screen  w-screen  overflow-clip' + (!intro && "blur-sm")}>
-
-                <div className='w-64 '>
-                    <Sidebar setConv={setConv} Conv={conv} />
-                </div>
-                <main className='w-5/6 px-5 pt-4 ' >
-                    <div className='flex justify-between'>
-                        <ModelSelection setModel={setModel} model={model} />
-                        <h1 className='text-gray-500 py-2 px-4 text-sm'>{tokenPerSec}/s</h1>
-
-
-                    </div>
-                    <div className='mx-auto my-0 w-4/6 pt-6'>
-
-                        <div className='h-[80vh] overflow-y-auto ' ref={(e) => e?.scrollTo({ top: e.scrollHeight, behavior: "smooth" })} >
-                            {conv
-                                .filter((data) => data.role !== "system")
-                                .map((data, index) => <Text key={index} text={data.content} type={data.role} />)}
-
+        <div className='bg-bg text-fg'>
+            {intro && <IntroductionOverlay onDone={() => setIntro(false)} />}
+            <div className={cn('flex h-screen w-screen overflow-clip', intro && 'blur-sm')}>
+                <Sidebar setConv={setConv} conv={conv} open={sidebarOpen} />
+                <main className='relative flex min-w-0 flex-1 flex-col'>
+                    <header className='flex h-14 shrink-0 items-center justify-between gap-2 px-3'>
+                        <div className='flex min-w-0 items-center gap-1'>
+                            <button type='button' onClick={() => setSidebarOpen((o) => !o)}
+                                aria-label={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+                                className='rounded-md p-2 text-muted hover:bg-hover hover:text-fg'>
+                                <PanelLeft className='h-4 w-4' aria-hidden='true' />
+                            </button>
+                            <div className='relative'>
+                                <ModelSelection setModel={setModel} model={model} />
+                            </div>
                         </div>
-                        <div className='absolute bottom-0 w-[55vw] mb-5'>
-                            <Input
-                                setConv={setConv}
-                                setInput={setInput}
-                                input={input}
-                                Conv={conv}
-                                model={model}
-                                setTokenPerSec={setTokenPerSec}
-                            />
-
-
-                            <p className='text-sm text-gray-300 pt-1'>Shift + enter for new line </p>
+                        <div className='flex items-center gap-2'>
+                            <span className='rounded-full border border-line px-2.5 py-0.5 font-mono text-xs tabular-nums text-muted' aria-label='Tokens per second'>{tokenPerSec} tok/s</span>
+                            <button type='button' onClick={toggle} aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                                className='rounded-md p-2 text-muted hover:bg-hover hover:text-fg'>
+                                {theme === 'dark' ? <Sun className='h-4 w-4' aria-hidden='true' /> : <Moon className='h-4 w-4' aria-hidden='true' />}
+                            </button>
+                        </div>
+                    </header>
+                    <div className='flex-1 overflow-y-auto' ref={scrollRef} aria-live='polite'>
+                        <div className='mx-auto w-full max-w-[720px] px-6 pb-40 pt-6'>
+                            {visible.length === 0
+                                ? <EmptyState onPick={(p) => void send(p, [])} disabled={isStreaming} />
+                                : visible.map((message) =>
+                                    <ChatMessage
+                                        key={message.id}
+                                        text={message.content}
+                                        role={message.role as "user" | "assistant"}
+                                        loading={message.id === pendingId}
+                                    />)}
                         </div>
                     </div>
-                </main >
-            </div >
-        </div >
+                    <div className='pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-bg via-bg to-transparent pt-8'>
+                        <div className='pointer-events-auto mx-auto w-full max-w-[720px] px-6 pb-4'>
+                            <ChatInput isStreaming={isStreaming} onSend={send} onStop={stop} />
+                            <p className='pt-2 text-center text-[11px] text-muted'>Enter to send · Shift + Enter for new line</p>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
     )
 }
 
+const SEED_IDS = new Set(INITIAL_CONVERSATION.map((m) => m.id))
 
+const EXAMPLES = [
+    "Explain how transformers work in simple terms",
+    "Write a Python function to deduplicate a list",
+    "Summarize the key ideas of stoicism",
+    "Draft a polite follow-up email",
+]
 
-
-
-
+export function EmptyState({ onPick, disabled }: { onPick: (prompt: string) => void, disabled: boolean }) {
+    return (
+        <div className='flex min-h-[55vh] flex-col items-center justify-center text-center'>
+            <div className='mb-4 flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-panel'>
+                <Sparkles className='h-4 w-4 text-accent' aria-hidden='true' />
+            </div>
+            <h1 className='text-xl font-semibold tracking-tight'>How can I help today?</h1>
+            <p className='mt-1 text-sm text-muted'>Chat with a local model running on MLX.</p>
+            <div className='mt-8 grid w-full grid-cols-1 gap-2 sm:grid-cols-2'>
+                {EXAMPLES.map((p) =>
+                    <button key={p} type='button' disabled={disabled} onClick={() => onPick(p)}
+                        className='rounded-xl border border-line px-4 py-3 text-left text-sm text-fg/80 transition-colors hover:border-fg/20 hover:bg-hover disabled:opacity-50'>
+                        {p}
+                    </button>)}
+            </div>
+        </div>
+    )
+}
 
 export default function Main() {
     return (
-        <>
-            <Alert>
-                <App />
-            </Alert>
-        </>
+        <AlertProvider>
+            <App />
+        </AlertProvider>
     )
 }

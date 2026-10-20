@@ -3,8 +3,6 @@ rag.py
 try.py
 test.py
 
-
-
 # Logs
 logs
 *.log
@@ -30,14 +28,6 @@ dist-ssr
 *.sln
 *.sw?
 
-
-gs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.DS_Store
 bun.lockb
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -98,7 +88,6 @@ cover/
 *.pot
 
 # Django stuff:
-*.log
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
@@ -202,26 +191,19 @@ cython_debug/
 #.idea/
 
 # Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
 
 # Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+
+# Project runtime state
+.last_check_time
+.server.pids
+backend/chroma_db/
+
+# Downloaded / converted models (fetched by install.sh / convert_bert.py)
+backend/models/*
+!backend/models/.gitkeep
+!backend/models/bert models/
+backend/models/bert models/*/*.npz
+backend/models/bert models/*/*.bin
+backend/models/bert models/*/*.safetensors
+backend/models/bert models/*/.cache/
